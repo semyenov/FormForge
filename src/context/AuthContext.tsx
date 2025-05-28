@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { GraphQLClient, gql } from "graphql-request";
+import { gql } from "graphql-request";
+import graphqlClient from "../hooks/useGraphqlClient";
 
 type Session = {
   id: string;
@@ -12,7 +13,6 @@ type User = {
   name: string;
   email: string;
   role: "user" | "admin";
-  activeOrganizationId?: string;
 };
 
 type AuthContextType = {
@@ -26,12 +26,6 @@ type AuthContextType = {
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const API_URL = "http://localhost:3000/api/graphql";
-const graphqlClient = new GraphQLClient(API_URL, {
-  credentials: "include",
-  mode: "cors"
-});
 
 const SESSION_QUERY = gql`
   query Session {

@@ -32,7 +32,7 @@ const AuthGuard = ({ children, requireActiveOrg = false }: AuthGuardProps) => {
   }
 
   // Check if an active organization is required but not present
-  if (requireActiveOrg && !user.activeOrganizationId) {
+  if (requireActiveOrg && !session?.activeOrganizationId) {
     toast.error('Please select an active organization');
     return <Navigate to="/organizations" state={{ from: location }} replace />;
   }

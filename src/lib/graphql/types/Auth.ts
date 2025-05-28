@@ -65,8 +65,8 @@ builder.mutationField(
         });
 
         // Set the session cookie
-        const { name, value, attributes } = lucia.createSessionCookie(session.id);
-        context.req.cookies.set(name, value, attributes);
+        const cookie = lucia.createSessionCookie(session.id);
+        context.req.cookies.set(cookie.name, cookie.value, cookie.attributes);
 
         return user;
       },

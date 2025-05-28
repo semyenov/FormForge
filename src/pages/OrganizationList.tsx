@@ -4,6 +4,7 @@ import { Building2, Plus, Settings, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { gql } from "graphql-request";
+import graphqlClient from "../hooks/useGraphqlClient";
 
 interface Organization {
   id: string;
@@ -13,95 +14,57 @@ interface Organization {
   createdAt: Date;
 }
 
+interface GetOrganizationsResponse {
+  organizations: Organization[];
+}
+
+interface SetActiveOrganizationResponse {
+  setActiveOrganization: boolean;
+}
+
+interface CreateOrganizationResponse {
+  createOrganization: Organization;
+}
+
 async function fetchOrganizations() {
-  const response = await fetch("/api/graphql", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      query: `
-        query GetOrganizations {
-          organizations {
-            id
-            name
-            slug
-            logo
-            createdAt
-          }
-        }
-      `,
-    }),
-  });
+  const response = await graphqlClient.request<GetOrganizationsResponse>(gql`
+    query GetOrganizations {
+      organizations {
+        id
+        name
+        slug
+        logo
+        createdAt
+      }
+    }
+  `);
 
-  const { data, errors } = await response.json();
-
-  if (errors) {
-    throw new Error(errors[0].message);
-  }
-
-  return data.organizations;
+  return response.organizations;
 }
 
 async function setActiveOrganization(organizationId: string) {
-  const response = await fetch("/api/graphql", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      query: gql`
-        mutation SetActiveOrganization($organizationId: String!) {
-          setActiveOrganization(organizationId: $organizationId)
-        }
-      `,
-      variables: {
-        organizationId,
-      },
-    }),
-  });
+  const response = await graphqlClient.request<SetActiveOrganizationResponse>(gql`
+    mutation SetActiveOrganization($organizationId: String!) {
+      setActiveOrganization(organizationId: $organizationId)
+    }
+  `, { organizationId });
 
-  const { data, errors } = await response.json();
-
-  if (errors) {
-    throw new Error(errors[0].message);
-  }
-
-  return data.setActiveOrganization;
+  return response.setActiveOrganization;
 }
 
-async function createOrganization(name: string, slug?: string) {
-  const response = await fetch("/api/graphql", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      query: `
-        mutation CreateOrganization($input: CreateOrganizationInput!) {
-          createOrganization(input: $input) {
-            id
-            name
-            slug
-          }
-        }
-      `,
-      variables: {
-        input: {
-          name,
-          slug,
-        },
-      },
-    }),
-  });
+async function createOrganization(input: { name: string; slug?: string; logo?: string }) {
+  const response = await graphqlClient.request<CreateOrganizationResponse>(gql`
+    mutation CreateOrganization($input: CreateOrganizationInput!) {
+      createOrganization(input: $input) {
+        id
+        name
+        slug
+        createdAt
+      }
+    }
+  `, { input });
 
-  const { data, errors } = await response.json();
-
-  if (errors) {
-    throw new Error(errors[0].message);
-  }
-
-  return data.createOrganization;
+  return response.createOrganization;
 }
 
 export default function OrganizationList() {
@@ -109,10 +72,12 @@ export default function OrganizationList() {
   const [isCreating, setIsCreating] = useState(false);
   const [newOrgName, setNewOrgName] = useState("");
   const [newOrgSlug, setNewOrgSlug] = useState("");
+  const [slugError, setSlugError] = useState("");
+  const [nameError, setNameError] = useState("");
   const queryClient = useQueryClient();
 
   const {
-    data: organizations,
+    data: organizations = [],
     isLoading,
     error,
   } = useQuery({
@@ -121,14 +86,23 @@ export default function OrganizationList() {
   });
 
   const createOrgMutation = useMutation({
-    mutationFn: (values: { name: string; slug?: string }) =>
-      createOrganization(values.name, values.slug),
-    onSuccess: () => {
+    mutationFn: createOrganization,
+    onSuccess: (newOrg) => {
       queryClient.invalidateQueries({ queryKey: ["organizations"] });
+
+      // Set the new organization as active
+      setActiveOrgMutation.mutate(newOrg.id, {
+        onSuccess: () => {
+          toast.success(`Organization "${newOrg.name}" created and set as active`);
+          refetchUser();
+        }
+      });
+
       setIsCreating(false);
       setNewOrgName("");
       setNewOrgSlug("");
-      toast.success("Organization created successfully");
+      setNameError("");
+      setSlugError("");
     },
     onError: (error) => {
       toast.error(`Failed to create organization: ${error.message}`);
@@ -146,12 +120,45 @@ export default function OrganizationList() {
     },
   });
 
+  const validateForm = () => {
+    let isValid = true;
+
+    // Validate name
+    if (!newOrgName.trim()) {
+      setNameError("Organization name is required");
+      isValid = false;
+    } else if (newOrgName.length < 2) {
+      setNameError("Name must be at least 2 characters long");
+      isValid = false;
+    } else {
+      setNameError("");
+    }
+
+    // Validate slug if provided
+    if (newOrgSlug) {
+      const slugRegex = /^[a-z0-9-]+$/;
+      if (!slugRegex.test(newOrgSlug)) {
+        setSlugError("Slug can only contain lowercase letters, numbers, and hyphens");
+        isValid = false;
+      } else {
+        setSlugError("");
+      }
+    } else {
+      setSlugError("");
+    }
+
+    return isValid;
+  };
+
   const handleCreateOrg = (e: React.FormEvent) => {
     e.preventDefault();
-    createOrgMutation.mutate({
-      name: newOrgName,
-      slug: newOrgSlug || undefined,
-    });
+
+    if (validateForm()) {
+      createOrgMutation.mutate({
+        name: newOrgName,
+        slug: newOrgSlug || undefined,
+      });
+    }
   };
 
   const handleSetActive = (organizationId: string) => {
@@ -224,10 +231,14 @@ export default function OrganizationList() {
                   type="text"
                   id="name"
                   value={newOrgName}
-                  onChange={(e) => setNewOrgName(e.target.value)}
-                  className="block mt-1 w-full form-input"
+                  onChange={(e) => {
+                    setNewOrgName(e.target.value);
+                    if (e.target.value.trim()) setNameError("");
+                  }}
+                  className={`block mt-1 w-full form-input ${nameError ? "border-red-500" : ""}`}
                   required
                 />
+                {nameError && <p className="mt-1 text-sm text-red-600">{nameError}</p>}
               </div>
 
               <div>
@@ -245,20 +256,33 @@ export default function OrganizationList() {
                     type="text"
                     id="slug"
                     value={newOrgSlug}
-                    onChange={(e) => setNewOrgSlug(e.target.value)}
-                    className="block w-full rounded-none rounded-r-md form-input"
+                    onChange={(e) => {
+                      setNewOrgSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+                      setSlugError("");
+                    }}
+                    className={`block w-full rounded-none rounded-r-md form-input ${slugError ? "border-red-500" : ""}`}
                     placeholder="my-organization"
                   />
                 </div>
-                <p className="mt-1 text-sm text-gray-500">
-                  A unique identifier for your organization's URL
-                </p>
+                {slugError ? (
+                  <p className="mt-1 text-sm text-red-600">{slugError}</p>
+                ) : (
+                  <p className="mt-1 text-sm text-gray-500">
+                    A unique identifier for your organization's URL
+                  </p>
+                )}
               </div>
 
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"
-                  onClick={() => setIsCreating(false)}
+                  onClick={() => {
+                    setIsCreating(false);
+                    setNewOrgName("");
+                    setNewOrgSlug("");
+                    setNameError("");
+                    setSlugError("");
+                  }}
                   className="btn btn-secondary"
                 >
                   Cancel
@@ -279,7 +303,7 @@ export default function OrganizationList() {
       )}
 
       <div className="overflow-hidden bg-white shadow sm:rounded-md">
-        {organizations?.length > 0 ? (
+        {organizations.length > 0 ? (
           <ul role="list" className="divide-y divide-gray-200">
             {organizations.map((org: Organization) => (
               <li key={org.id}>
