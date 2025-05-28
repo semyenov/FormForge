@@ -1,0 +1,16 @@
+overwrite: true
+schema: schema.graphql
+documents: "src/**/!(*.generated).{tsx,ts}"
+generates:
+  src/__generated__/types.generated.ts:
+    plugins:
+      - typescript
+  src/:
+    preset: near-operation-file
+    presetConfig:
+      folder: __generated__
+      extension: .generated.tsx
+      baseTypesPath: __generated__/types.generated.ts
+    plugins:
+      - typescript-operations
+      - typescript-react-apollo

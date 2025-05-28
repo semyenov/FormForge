@@ -33,11 +33,11 @@ const formFieldStatusEnum = builder.enumType('FormFieldStatus', {
 });
 
 // Define FormField type
-  const FormFieldType
-  = builder.drizzleObject('formFields', {
+const FormFieldType
+  = builder.drizzleNode('formFields', {
     name: 'FormField',
+    id: { column: (formField) => formField.id },
     fields: (t) => ({
-      id: t.exposeID('id'),
       name: t.exposeString('name'),
       type: t.expose('type', { type: formFieldTypeEnum }),
       required: t.exposeBoolean('required'),
@@ -49,51 +49,48 @@ const formFieldStatusEnum = builder.enumType('FormFieldStatus', {
   });
 
 // Define Form type
-export const FormType
-  = builder.drizzleObject('forms', {
-    name: 'Form',
-    fields: (t) => ({
-      id: t.exposeID('id'),
-      title: t.exposeString('title'),
-      description: t.exposeString('description', { nullable: true }),
-      status: t.expose('status', { type: formStatusEnum }),
-      createdAt: t.expose('createdAt', { type: 'Date' }),
-      updatedAt: t.expose('updatedAt', { type: 'Date' }),
-      version: t.exposeInt('version'),
-      fields: t.field({
-        type: [FormFieldType],
-        resolve: async (form, __, context) => {
-          return context.db.query.formFields.findMany({
-            where: { formId: form.id },
-            orderBy: { order: 'asc' },
-          });
-        },
-      }),
+export const FormType = builder.drizzleNode('forms', {
+  name: 'Form',
+  id: { column: (form) => form.id },
+  fields: (t) => ({
+    title: t.exposeString('title'),
+    description: t.exposeString('description', { nullable: true }),
+    status: t.expose('status', { type: formStatusEnum }),
+    createdAt: t.expose('createdAt', { type: 'Date' }),
+    updatedAt: t.expose('updatedAt', { type: 'Date' }),
+    version: t.exposeInt('version'),
+    fields: t.field({
+      type: [FormFieldType],
+      resolve: async (form, __, { db }) => {
+        return db.query.formFields.findMany({
+          where: { formId: form.id },
+          orderBy: { order: 'asc' },
+        });
+      },
     }),
-  });
+  }),
+});
 
 // Input type for creating/updating form fields
-const FormFieldInput
-  = builder.inputType('FormFieldInput', {
-    fields: (t) => ({
-      id: t.string({ required: false }),
-      name: t.string({ required: true }),
-      type: t.field({ type: formFieldTypeEnum, required: true }),
-      required: t.boolean({ required: true }),
-      order: t.int({ required: true }),
-      options: t.string({ required: false }),
-    }),
-  });
+const FormFieldInput = builder.inputType('FormFieldInput', {
+  fields: (t) => ({
+    id: t.string({ required: false }),
+    name: t.string({ required: true }),
+    type: t.field({ type: formFieldTypeEnum, required: true }),
+    required: t.boolean({ required: true }),
+    order: t.int({ required: true }),
+    options: t.string({ required: false }),
+  }),
+});
 
 // Input type for creating a form
-const CreateFormInput
-  = builder.inputType('CreateFormInput', {
-    fields: (t) => ({
-      title: t.string({ required: true }),
-      description: t.string({ required: false }),
-      fields: t.field({ type: [FormFieldInput], required: true }),
-    }),
-  });
+const CreateFormInput = builder.inputType('CreateFormInput', {
+  fields: (t) => ({
+    title: t.string({ required: true }),
+    description: t.string({ required: false }),
+    fields: t.field({ type: [FormFieldInput], required: true }),
+  }),
+});
 
 // Query to get all forms for the current user's organization
 builder.queryField('forms', (t) =>
@@ -102,13 +99,13 @@ builder.queryField('forms', (t) =>
     authScopes: {
       loggedIn: true,
     },
-    resolve: async (_, __, context) => {
-      if (!context.session?.activeOrganizationId) {
+    resolve: async (_, __, { db, session }) => {
+      if (!session?.activeOrganizationId) {
         throw new Error('No active organization');
       }
 
-      return context.db.query.forms.findMany({
-        where: { organizationId: context.session.activeOrganizationId },
+      return db.query.forms.findMany({
+        where: { organizationId: session.activeOrganizationId },
       });
     },
   })
@@ -124,8 +121,8 @@ builder.queryField('form', (t) =>
     authScopes: {
       loggedIn: true,
     },
-    resolve: async (_, args, context) => {
-      const form = await context.db.query.forms.findFirst({
+    resolve: async (_, args, { db, session }) => {
+      const form = await db.query.forms.findFirst({
         where: { id: args.id },
       });
 
@@ -148,44 +145,44 @@ builder.mutationField('createForm', (t) =>
     // authScopes: {
     //   loggedIn: true,
     // },
-    resolve: async (_, args, context) => {
-      if (!context.user || !context.session?.activeOrganizationId) {
+    resolve: async (_, args, { db, user, session }) => {
+      if (!user || !session?.activeOrganizationId) {
         throw new Error('Not authenticated or no active organization');
       }
 
       const formId = crypto.randomUUID();
 
       // Create the form
-      await context.db.insert(tables.forms).values({
+      await db.insert(tables.forms).values({
         id: formId,
         title: args.input.title,
         description: args.input.description || null,
-        creatorMemberId: context.user.id, // This would actually be a member ID in a real app
-        organizationId: context.session.activeOrganizationId,
-        status: 'draft',
+        creatorMemberId: user.id, // This would actually be a member ID in a real app
+        organizationId: session.activeOrganizationId,
+        status: 'draft' as const,
         updatedAt: new Date(),
       });
 
       // Create the form fields
       if (args.input.fields.length > 0) {
-        await context.db.insert(tables.formFields).values(
+        await db.insert(tables.formFields).values(
           (
-          args.input.fields.map(
-            field => ({
-              id: crypto.randomUUID(),
-              formId: formId,
-              name: field.name,
-              type: field.type,
-              required: field.required,
-              order: field.order,
-              options: field.options || null,
-              status: 'draft' as const,
-            }))
-        ))
+            args.input.fields.map(
+              field => ({
+                id: crypto.randomUUID(),
+                formId: formId,
+                name: field.name,
+                type: field.type,
+                required: field.required,
+                order: field.order,
+                options: field.options || null,
+                status: 'draft' as const,
+              }))
+          ))
       }
 
       // Return the created form
-      const newForm = await context.db.query.forms.findFirst({
+      const newForm = await db.query.forms.findFirst({
         where: { id: formId },
       });
 

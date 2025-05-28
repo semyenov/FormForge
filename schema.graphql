@@ -1,0 +1,287 @@
+type Comment implements Node {
+  content: String!
+  createdAt: Date!
+  formFieldId: String
+  id: ID!
+  memberId: String!
+  reviewFlowId: String!
+  user: User!
+}
+
+input CreateCommentInput {
+  content: String!
+  formFieldId: String
+  reviewFlowId: String!
+}
+
+input CreateFormInput {
+  description: String
+  fields: [FormFieldInput!]!
+  title: String!
+}
+
+input CreateFormTemplateInput {
+  description: String
+  fields: [FormTemplateFieldInput!]!
+  name: String!
+}
+
+input CreateOrganizationInput {
+  logo: String
+  name: String!
+  slug: String
+}
+
+input CreateReviewFlowInput {
+  formId: String!
+}
+
+scalar Date
+
+type Form implements Node {
+  createdAt: Date!
+  description: String
+  fields: [FormField!]!
+  id: ID!
+  status: FormStatus!
+  title: String!
+  updatedAt: Date!
+  version: Int!
+}
+
+type FormField implements Node {
+  id: ID!
+  name: String!
+  options: String
+  order: Int!
+  required: Boolean!
+  status: FormFieldStatus!
+  type: FormFieldTypeEnum!
+  value: String
+}
+
+input FormFieldInput {
+  id: String
+  name: String!
+  options: String
+  order: Int!
+  required: Boolean!
+  type: FormFieldTypeEnum!
+}
+
+enum FormFieldStatus {
+  approved
+  draft
+  rejected
+}
+
+enum FormFieldType {
+  checkbox
+  date
+  file
+  number
+  radio
+  select
+  text
+  textarea
+}
+
+enum FormFieldTypeEnum {
+  checkbox
+  date
+  file
+  number
+  radio
+  select
+  text
+  textarea
+}
+
+enum FormStatus {
+  approved
+  draft
+  needs_changes
+  rejected
+  under_review
+}
+
+type FormTemplate implements Node {
+  createdAt: Date!
+  description: String
+  fields: [FormTemplateField!]!
+  id: ID!
+  name: String!
+  updatedAt: Date!
+  version: Int!
+}
+
+type FormTemplateField implements Node {
+  defaultValue: String
+  id: ID!
+  name: String!
+  options: String
+  order: Int!
+  required: Boolean!
+  type: FormFieldType!
+  validationRules: String
+}
+
+input FormTemplateFieldInput {
+  defaultValue: String
+  id: String
+  name: String!
+  options: String
+  order: Int!
+  required: Boolean!
+  type: FormFieldType!
+  validationRules: String
+}
+
+input InviteMemberInput {
+  email: String!
+  organizationId: String!
+  role: MemberRole!
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+type Member implements Node {
+  createdAt: Date!
+  id: ID!
+  role: MemberRole!
+  user: User!
+}
+
+enum MemberRole {
+  executor
+  member
+  owner
+  reviewer
+}
+
+"""The root mutation type"""
+type Mutation {
+  addComment(input: CreateCommentInput!): Comment!
+  createForm(input: CreateFormInput!): Form!
+  createFormTemplate(input: CreateFormTemplateInput!): FormTemplate!
+  createOrganization(input: CreateOrganizationInput!): Organization!
+  createReviewFlow(input: CreateReviewFlowInput!): ReviewFlow!
+  deleteComment(id: String!): Boolean!
+  deleteFormTemplate(id: String!): Boolean!
+  inviteMember(input: InviteMemberInput!): Boolean!
+  login(input: LoginInput!): User!
+  logout: Boolean!
+  register(input: RegisterInput!): User!
+
+  """Set the active organization for the current user."""
+  setActiveOrganization(organizationId: String!): Boolean!
+  updateFormTemplate(id: String!, input: UpdateFormTemplateInput!): FormTemplate!
+  updateOrganization(id: String!, input: UpdateOrganizationInput!): Organization!
+  updateReviewFlow(id: String!, input: UpdateReviewFlowInput!): ReviewFlow!
+}
+
+interface Node {
+  id: ID!
+}
+
+type Organization implements Node {
+  createdAt: Date!
+  id: ID!
+  logo: String
+  members: [Member!]!
+  name: String!
+  slug: String
+}
+
+"""The root query type"""
+type Query {
+  fieldComments(formFieldId: String!, reviewFlowId: String!): [Comment!]!
+  form(id: String!): Form!
+  formReviewFlows(formId: String!): [ReviewFlow!]!
+  formTemplate(id: String!): FormTemplate!
+  formTemplates: [FormTemplate!]!
+  forms: [Form!]!
+  me: User!
+  node(id: ID!): Node
+  nodes(ids: [ID!]!): [Node]!
+  organization(id: String!): Organization!
+  organizationReviewFlows(organizationId: String!, status: ReviewFlowStatus): [ReviewFlow!]!
+  organizations: [Organization!]!
+  reviewFlow(id: String!): ReviewFlow!
+  reviewFlowComments(reviewFlowId: String!): [Comment!]!
+
+  """Get the current user's session."""
+  session: Session!
+  users: [User!]!
+}
+
+input RegisterInput {
+  email: String!
+  name: String!
+  password: String!
+}
+
+type ReviewFlow implements Node {
+  comments: [Comment!]!
+  createdAt: Date!
+  form: Form!
+  formId: String!
+  id: ID!
+  lastModifiedBy: String
+  organizationId: String!
+  status: ReviewFlowStatus!
+  updatedAt: Date!
+  version: Int!
+}
+
+enum ReviewFlowStatus {
+  closed
+  open
+}
+
+"""A session is a user's session on the platform."""
+type Session implements Node {
+  activeOrganizationId: String
+  createdAt: Date
+  expiresAt: Date
+  id: ID!
+  impersonatedBy: String
+  ipAddress: String
+  token: String
+  updatedAt: Date
+  userAgent: String
+  userId: String!
+}
+
+input UpdateFormTemplateInput {
+  description: String
+  fields: [FormTemplateFieldInput!]
+  name: String
+}
+
+input UpdateOrganizationInput {
+  logo: String
+  name: String
+  slug: String
+}
+
+input UpdateReviewFlowInput {
+  status: ReviewFlowStatus
+}
+
+type User implements Node {
+  banExpires: Date
+  banReason: String
+  banned: Boolean
+  createdAt: Date!
+  email: String!
+  emailVerified: Boolean
+  id: ID!
+  image: String
+  name: String!
+  role: String!
+  updatedAt: Date!
+}

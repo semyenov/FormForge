@@ -1,169 +1,147 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { gql } from "graphql-request";
-import graphqlClient from "../hooks/useGraphqlClient";
-
-type Session = {
-  id: string;
-  userId: string;
-  activeOrganizationId: string;
-};
-
-type User = {
-  id: string;
-  name: string;
-  email: string;
-  role: "user" | "admin";
-};
+import { gql } from "@apollo/client";
+import {
+  Session,
+  User,
+} from "../__generated__/types.generated";
+import {
+  useLoginMutation,
+  useLogoutMutation,
+  useRegisterMutation,
+  useSessionQuery
+} from './__generated__/AuthContext.generated.tsx';
 
 type AuthContextType = {
   user: User | null;
   session: Session | null;
-  loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
-  refetchUser: () => Promise<void>;
 };
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const SESSION_QUERY = gql`
+export const SESSION_QUERY = gql`
   query Session {
     session {
       id
       userId
       activeOrganizationId
+      expiresAt
+      createdAt
+      updatedAt
+      ipAddress
+      userAgent
+      token
+      impersonatedBy
     }
   }
 `;
 
 // GraphQL queries and mutations
-const ME_QUERY = gql`
+export const ME_QUERY = gql`
   query Me {
     me {
       id
       name
       email
       role
+      emailVerified
+      banExpires
+      banReason
+      banned
+      createdAt
+      updatedAt
     }
   }
 `;
 
-const LOGIN_MUTATION = gql`
+export const LOGIN_MUTATION = gql`
   mutation Login($input: LoginInput!) {
     login(input: $input) {
       id
       name
       email
       role
+      emailVerified
+      banExpires
+      banReason
+      banned
+      createdAt
+      updatedAt
     }
   }
 `;
 
-const REGISTER_MUTATION = gql`
+export const REGISTER_MUTATION = gql`
   mutation Register($input: RegisterInput!) {
     register(input: $input) {
       id
       name
       email
       role
+      banExpires
+      banReason
+      emailVerified
+      banned
+      createdAt
+      updatedAt
     }
   }
 `;
 
-const LOGOUT_MUTATION = gql`
+export const LOGOUT_MUTATION = gql`
   mutation Logout {
     logout
   }
 `;
 
+const AuthContext = createContext<AuthContextType>(undefined!);
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
 
-  const fetchUser = async () => {
-    try {
-      const data = await graphqlClient.request<{ me: User | null }>(ME_QUERY);
-      setUser(data.me);
-      return data.me;
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      setUser(null);
-      return null;
-    }
-  };
+  const [loginMutation] = useLoginMutation();
+  const [logoutMutation] = useLogoutMutation();
+  const [registerMutation] = useRegisterMutation();
 
-  const fetchSession = async () => {
-    try {
-      const data = await graphqlClient.request<{ session: Session | null }>(SESSION_QUERY);
-      setSession(data.session);
-      return data.session;
-    } catch (error) {
-      console.error("Error fetching session:", error);
-      setSession(null);
-      return null;
-    }
-  };
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        // First check if there's a session
-        const sessionData = await fetchSession();
-
-        // If there's a session, fetch the user data
-        if (sessionData) {
-          await fetchUser();
-        }
-      } catch (error) {
-        console.error("Auth check error:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, []);
+  const { refetch: refetchSession } = useSessionQuery({skip: true,});
 
   const login = async (email: string, password: string) => {
-    const data = await graphqlClient.request<{ login: User | null }>(
-      LOGIN_MUTATION,
-      { input: { email, password } }
-    );
-
-    if (data.login) {
-      setUser(data.login);
-      await fetchSession(); // Fetch session after successful login
+    const { data: loginData,  } = await loginMutation({ variables: { input: { email, password } } });
+    if (loginData?.login) {
+      setUser(loginData.login);
+      const { data: sessionData } = await refetchSession();
+      setSession(sessionData?.session);
     }
   };
 
   const logout = async () => {
-    await graphqlClient.request(LOGOUT_MUTATION);
+    await logoutMutation();
     setUser(null);
     setSession(null);
   };
 
   const register = async (name: string, email: string, password: string) => {
-    const data = await graphqlClient.request<{ register: User | null }>(
-      REGISTER_MUTATION,
-      { input: { name, email, password } }
-    );
+    const { data: registerData } = await registerMutation({
+      variables: {
+        input: {
+          name,
+          email,
+          password,
+        },
+      },
+    });
+    if (registerData?.register) {
+      setUser(registerData.register);
 
-    if (data.register) {
-      setUser(data.register);
-      await fetchSession(); // Fetch session after successful registration
+      const { data: sessionData } = await refetchSession();
+      setSession(sessionData?.session);
     }
-  };
-
-  const refetchUser = async () => {
-    await fetchUser();
-    await fetchSession();
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, login, logout, register, refetchUser }}
+      value={{ user, session, login, logout, register }}
     >
       {children}
     </AuthContext.Provider>

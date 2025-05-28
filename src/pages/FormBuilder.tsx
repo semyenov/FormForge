@@ -2,30 +2,20 @@ import { useState, useEffect } from 'react';
 import { Calendar, FileText, Hash, List, MoveDown, MoveUp, Plus, Save, SquareCheck, TextCursor, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useCreateForm, useGetForm, parseOptions, stringifyOptions } from '../hooks/useFormManagement';
-
-type FieldType = 'text' | 'textarea' | 'number' | 'date' | 'select' | 'checkbox' | 'radio' | 'file';
-
-interface FormField {
-  id: string;
-  name: string;
-  type: FieldType;
-  required: boolean;
-  options?: string[];
-  order: number;
-}
+import { useCreateFormTemplateMutation, useGetFormTemplateQuery } from '../hooks/__generated__/useFormManagement.generated';
+import { FormFieldType, FormTemplateField, FormTemplateFieldInput } from '../__generated__/types.generated';
 
 export default function FormBuilder() {
   const { formId } = useParams();
   const navigate = useNavigate();
-  const [formTitle, setFormTitle] = useState('Untitled Form');
+  const [formName, setFormName] = useState('Untitled Form');
   const [formDescription, setFormDescription] = useState('');
-  const [fields, setFields] = useState<FormField[]>([]);
+  const [fields, setFields] = useState<FormTemplateField[]>([]);
   const [isAddingField, setIsAddingField] = useState(false);
 
   // Query the form if we have an ID
-  const { data: formData, isLoading } = useGetForm(formId || '');
-  const { mutateAsync: createForm, isPending: isCreating } = useCreateForm();
+  const { data: formData } = useGetFormTemplateQuery({ variables: { id: formId || '' }, skip: !formId });
+  const [createFormTemplate] = useCreateFormTemplateMutation();
 
   const fieldTypeOptions = [
     { value: 'text', label: 'Text', icon: TextCursor },
@@ -36,14 +26,16 @@ export default function FormBuilder() {
     { value: 'checkbox', label: 'Checkbox', icon: SquareCheck },
   ];
 
-  const addField = (type: FieldType) => {
-    const newField: FormField = {
+  const addField = (type: FormTemplateField['type']) => {
+    const newField: FormTemplateField = {
       id: Date.now().toString(),
       name: `Question ${fields.length + 1}`,
       type,
       required: false,
-      options: type === 'select' || type === 'radio' ? ['Option 1', 'Option 2'] : undefined,
+      options: type === 'select' || type === 'radio' ? 'Option 1,Option 2' : null,
       order: fields.length,
+      validationRules: null,
+      defaultValue: null,
     };
 
     setFields([...fields, newField]);
@@ -54,7 +46,7 @@ export default function FormBuilder() {
     setFields(fields.filter(field => field.id !== id));
   };
 
-  const updateField = (id: string, updates: Partial<FormField>) => {
+  const updateField = (id: string, updates: Partial<FormTemplateField>) => {
     setFields(fields.map(field =>
       field.id === id ? { ...field, ...updates } : field
     ));
@@ -84,17 +76,20 @@ export default function FormBuilder() {
   // Load form data if editing an existing form
   useEffect(() => {
     if (formData) {
-      setFormTitle(formData.title);
-      setFormDescription(formData.description || '');
+      setFormName(formData.formTemplate.name);
+      setFormDescription(formData.formTemplate.description || '');
 
       // Convert API form fields to local format
-      const convertedFields = formData.fields.map(field => ({
+      const convertedFields: FormTemplateField[] = formData.formTemplate.fields.map(field => ({
         id: field.id,
         name: field.name,
-        type: field.type as FieldType,
+        type: field.type,
         required: field.required,
-        options: field.options ? parseOptions(field.options) : undefined,
+        options: field.options ? field.options : null,
         order: field.order,
+        templateId: '',
+        validationRules: null,
+        defaultValue: null,
       }));
 
       setFields(convertedFields);
@@ -104,19 +99,26 @@ export default function FormBuilder() {
   const saveForm = async () => {
     try {
       // Prepare form fields for API
-      const formFields = fields.map(field => ({
+      const formFields: FormTemplateFieldInput[] = fields.map(field => ({
         name: field.name,
-        type: field.type,
+        type: field.type as FormFieldType,
         required: field.required,
         order: field.order,
-        options: field.options ? stringifyOptions(field.options) : undefined,
+          options: field.options ? field.options : null,
+        templateId: '',
+        validationRules: null,
+        defaultValue: null,
       }));
 
       // Call the create form mutation
-      const result = await createForm({
-        title: formTitle,
-        description: formDescription || undefined,
-        fields: formFields,
+      const result = await createFormTemplate({
+        variables: {
+          input: {
+            name: formName,
+            description: formDescription || null,
+            fields: formFields,
+          },
+        },
       });
 
       // Navigate to the form list after successful creation
@@ -129,34 +131,34 @@ export default function FormBuilder() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <div className="flex justify-between items-center mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">Form Builder</h1>
         <button
           onClick={saveForm}
           className="btn btn-primary"
         >
-          <Save className="mr-1 w-4 h-4" />
+          <Save className="mr-1 h-4 w-4" />
           Save Form
         </button>
       </div>
 
-      <div className="mb-6 card">
+      <div className="card mb-6">
         <div className="mb-4">
-          <label htmlFor="formTitle" className="block mb-1 text-sm font-medium text-gray-700">
-            Form Title
+          <label htmlFor="formName" className="mb-1 block text-sm font-medium text-gray-700">
+            Form Name
           </label>
           <input
             type="text"
-            id="formTitle"
-            value={formTitle}
-            onChange={(e) => setFormTitle(e.target.value)}
+            id="formName"
+            value={formName}
+            onChange={(e) => setFormName(e.target.value)}
             className="form-input"
-            placeholder="Enter form title"
+            placeholder="Enter form name"
           />
         </div>
 
         <div>
-          <label htmlFor="formDescription" className="block mb-1 text-sm font-medium text-gray-700">
+          <label htmlFor="formDescription" className="mb-1 block text-sm font-medium text-gray-700">
             Description (Optional)
           </label>
           <textarea
@@ -171,8 +173,8 @@ export default function FormBuilder() {
       </div>
 
       {fields.map((field, index) => (
-        <div key={field.id} className="mb-4 border-l-4 border-blue-500 card">
-          <div className="flex justify-between items-start mb-4">
+        <div key={field.id} className="card mb-4 border-l-4 border-blue-500">
+          <div className="mb-4 flex items-start justify-between">
             <h3 className="text-lg font-medium">Field {index + 1}</h3>
             <div className="flex space-x-2">
               <button
@@ -180,26 +182,26 @@ export default function FormBuilder() {
                 disabled={index === 0}
                 className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-30"
               >
-                <MoveUp className="w-5 h-5" />
+                <MoveUp className="h-5 w-5" />
               </button>
               <button
                 onClick={() => moveField(field.id, 'down')}
                 disabled={index === fields.length - 1}
                 className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-30"
               >
-                <MoveDown className="w-5 h-5" />
+                <MoveDown className="h-5 w-5" />
               </button>
               <button
                 onClick={() => removeField(field.id)}
                 className="p-1 text-red-500 hover:text-red-700"
               >
-                <Trash2 className="w-5 h-5" />
+                <Trash2 className="h-5 w-5" />
               </button>
             </div>
           </div>
 
           <div className="mb-4">
-            <label className="block mb-1 text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
               Question / Label
             </label>
             <input
@@ -212,12 +214,12 @@ export default function FormBuilder() {
           </div>
 
           <div className="mb-4">
-            <label className="block mb-1 text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
               Field Type
             </label>
             <select
               value={field.type}
-              onChange={(e) => updateField(field.id, { type: e.target.value as FieldType })}
+              onChange={(e) => updateField(field.id, { type: e.target.value as FormTemplateField['type'] })}
               className="form-input"
             >
               {fieldTypeOptions.map(option => (
@@ -230,39 +232,40 @@ export default function FormBuilder() {
 
           {(field.type === 'select' || field.type === 'radio') && field.options && (
             <div className="mb-4">
-              <label className="block mb-1 text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
                 Options
               </label>
-              {field.options.map((option, optionIndex) => (
-                <div key={optionIndex} className="flex mb-2">
+              {field.options?.split(',').map((option, optionIndex) => (
+                <div key={optionIndex} className="mb-2 flex">
                   <input
                     type="text"
                     value={option}
                     onChange={(e) => {
-                      const newOptions = [...field.options!];
+                      const newOptions = field.options?.split(',') || [];
                       newOptions[optionIndex] = e.target.value;
-                      updateField(field.id, { options: newOptions });
+                      updateField(field.id, { options: newOptions.join(',') || null });
                     }}
                     className="form-input"
                     placeholder={`Option ${optionIndex + 1}`}
                   />
                   <button
                     onClick={() => {
-                      const newOptions = field.options!.filter((_, i) => i !== optionIndex);
-                      updateField(field.id, { options: newOptions });
+                      const newOptions = field.options?.split(',').filter((_, i) => i !== optionIndex);
+                      updateField(field.id, { options: newOptions?.join(',') || null });
                     }}
-                    className="p-2 ml-2 text-red-500 hover:text-red-700"
+                    className="ml-2 p-2 text-red-500 hover:text-red-700"
                   >
-                    <Trash2 className="w-5 h-5" />
+                    <Trash2 className="h-5 w-5" />
                   </button>
                 </div>
               ))}
               <button
                 onClick={() => {
-                  const newOptions = [...field.options!, `Option ${field.options!.length + 1}`];
-                  updateField(field.id, { options: newOptions });
+                  const newOptions = [...(field.options?.split(',') || []), `Option ${field.options ? field.options.split(',').length + 1 : 0}`];
+                  updateField(field.id, { options: newOptions.join(',') || null });
                 }}
                 className="mt-2 text-sm text-blue-600 hover:text-blue-800"
+                disabled={!field.options}
               >
                 + Add Option
               </button>
@@ -275,9 +278,9 @@ export default function FormBuilder() {
               id={`required-${field.id}`}
               checked={field.required}
               onChange={(e) => updateField(field.id, { required: e.target.checked })}
-              className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
-            <label htmlFor={`required-${field.id}`} className="block ml-2 text-sm text-gray-700">
+            <label htmlFor={`required-${field.id}`} className="ml-2 block text-sm text-gray-700">
               Required field
             </label>
           </div>
@@ -285,21 +288,21 @@ export default function FormBuilder() {
       ))}
 
       {isAddingField ? (
-        <div className="mb-6 card">
+        <div className="card mb-6">
           <h3 className="mb-4 text-lg font-medium">Select Field Type</h3>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             {fieldTypeOptions.map(option => (
               <button
                 key={option.value}
-                onClick={() => addField(option.value as FieldType)}
-                className="flex flex-col justify-center items-center p-4 rounded-lg border border-gray-200 transition-colors hover:bg-gray-50"
+                onClick={() => addField(option.value as FormTemplateField['type'])}
+                className="flex flex-col items-center justify-center rounded-lg border border-gray-200 p-4 transition-colors hover:bg-gray-50"
               >
-                <option.icon className="mb-2 w-8 h-8 text-blue-500" />
+                <option.icon className="mb-2 h-8 w-8 text-blue-500" />
                 <span className="text-sm font-medium">{option.label}</span>
               </button>
             ))}
           </div>
-          <div className="flex justify-end mt-4">
+          <div className="mt-4 flex justify-end">
             <button
               onClick={() => setIsAddingField(false)}
               className="btn btn-secondary"
@@ -311,9 +314,9 @@ export default function FormBuilder() {
       ) : (
         <button
           onClick={() => setIsAddingField(true)}
-          className="flex justify-center items-center py-3 w-full text-gray-500 rounded-lg border-2 border-gray-300 border-dashed transition-colors hover:border-blue-500 hover:text-blue-500"
+          className="flex w-full items-center justify-center rounded-lg border-2 border-dashed border-gray-300 py-3 text-gray-500 transition-colors hover:border-blue-500 hover:text-blue-500"
         >
-          <Plus className="mr-2 w-5 h-5" />
+          <Plus className="mr-2 h-5 w-5" />
           Add Field
         </button>
       )}

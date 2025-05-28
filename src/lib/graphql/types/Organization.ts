@@ -13,10 +13,10 @@ const memberRoleEnum = builder.enumType('MemberRole', {
 });
 
 // Define Member type
-const MemberType = builder.drizzleObject('members', {
+const MemberType = builder.drizzleNode('members', {
   name: 'Member',
+  id: { column: (member) => member.id },
   fields: (t) => ({
-    id: t.exposeID('id'),
     role: t.expose('role', { type: memberRoleEnum }),
     createdAt: t.expose('createdAt', { type: 'Date' }),
     user: t.field({
@@ -35,10 +35,10 @@ const MemberType = builder.drizzleObject('members', {
 });
 
 // Define Organization type
-export const OrganizationType = builder.drizzleObject('organizations', {
+export const OrganizationType = builder.drizzleNode('organizations', {
   name: 'Organization',
+  id: { column: (organization) => organization.id },
   fields: (t) => ({
-    id: t.exposeID('id'),
     name: t.exposeString('name'),
     slug: t.exposeString('slug', { nullable: true }),
     logo: t.exposeString('logo', { nullable: true }),
@@ -88,14 +88,14 @@ builder.queryField('organizations', (t) =>
     authScopes: {
       loggedIn: true,
     },
-    resolve: async (_, __, context) => {
-      if (!context.user) {
+    resolve: async (_, __, { user, db }) => {
+      if (!user) {
         throw new Error('Not authenticated');
       }
 
       // Get all members for the current user
-      const members = await context.db.query.members.findMany({
-        where: { userId: context.user.id },
+      const members = await db.query.members.findMany({
+        where: { userId: user.id },
       });
 
       // Get all organizations for those members
@@ -104,7 +104,7 @@ builder.queryField('organizations', (t) =>
         return [];
       }
 
-      return context.db.query.organizations.findMany({
+      return db.query.organizations.findMany({
         where: { id: { in: organizationIds } },
       });
     },
@@ -121,15 +121,15 @@ builder.queryField('organization', (t) =>
     authScopes: {
       loggedIn: true,
     },
-    resolve: async (_, args, context) => {
-      if (!context.user) {
+    resolve: async (_, args, { user, db }) => {
+      if (!user) {
         throw new Error('Not authenticated');
       }
 
       // Check if user is a member of this organization
-      const member = await context.db.query.members.findFirst({
+      const member = await db.query.members.findFirst({
         where: {
-          userId: context.user.id,
+          userId: user.id,
           organizationId: args.id,
         },
       });
@@ -138,7 +138,7 @@ builder.queryField('organization', (t) =>
         throw new Error('Not a member of this organization');
       }
 
-      const organization = await context.db.query.organizations.findFirst({
+      const organization = await db.query.organizations.findFirst({
         where: { id: args.id },
       });
 
@@ -161,15 +161,15 @@ builder.mutationField('createOrganization', (t) =>
     authScopes: {
       loggedIn: true,
     },
-    resolve: async (_, args, context) => {
-      if (!context.user) {
+    resolve: async (_, args, { user, db }) => {
+      if (!user) {
         throw new Error('Not authenticated');
       }
 
       const organizationId = crypto.randomUUID();
 
       // Create the organization
-      await context.db.insert(tables.organizations).values({
+      await db.insert(tables.organizations).values({
         id: organizationId,
         name: args.input.name,
         slug: args.input.slug || null,
@@ -179,18 +179,18 @@ builder.mutationField('createOrganization', (t) =>
 
       // Add the current user as an owner
       const memberId = crypto.randomUUID();
-      await context.db.insert(tables.members).values({
+      await db.insert(tables.members).values({
         id: memberId,
-        userId: context.user.id,
+        userId: user.id,
         organizationId: organizationId,
         role: 'owner',
         createdAt: new Date(),
-        lastModifiedBy: context.user.id,
+        lastModifiedBy: user.id,
         version: 1,
       });
 
       // Return the created organization
-      const newOrganization = await context.db.query.organizations.findFirst({
+      const newOrganization = await db.query.organizations.findFirst({
         where: { id: organizationId },
       });
 
@@ -214,15 +214,15 @@ builder.mutationField('updateOrganization', (t) =>
     authScopes: {
       loggedIn: true,
     },
-    resolve: async (_, args, context) => {
-      if (!context.user) {
+    resolve: async (_, args, { user, db }) => {
+      if (!user) {
         throw new Error('Not authenticated');
       }
 
       // Check if user is an owner of this organization
-      const member = await context.db.query.members.findFirst({
+      const member = await db.query.members.findFirst({
         where: {
-          userId: context.user.id,
+          userId: user.id,
           organizationId: args.id,
           role: 'owner',
         },
@@ -239,13 +239,13 @@ builder.mutationField('updateOrganization', (t) =>
       if (args.input.logo !== undefined) updateValues.logo = args.input.logo;
 
       if (Object.keys(updateValues).length > 0) {
-        await context.db.update(tables.organizations)
+        await db.update(tables.organizations)
           .set(updateValues)
           .where(eq(tables.organizations.id, args.id));
       }
 
       // Return the updated organization
-      const updatedOrganization = await context.db.query.organizations.findFirst({
+      const updatedOrganization = await db.query.organizations.findFirst({
         where: { id: args.id },
       });
 
@@ -268,21 +268,21 @@ builder.mutationField('inviteMember', (t) =>
     authScopes: {
       loggedIn: true,
     },
-    resolve: async (_, args, context) => {
-      if (!context.user) {
+    resolve: async (_, args, { user, db }) => {
+      if (!user) {
         throw new Error('Not authenticated');
       }
 
       // Check if user is an owner or admin of this organization
-      const member = await context.db.query.members.findFirst({
+      const member = await db.query.members.findFirst({
         where: {
-          userId: context.user.id,
+          userId: user.id,
           organizationId: args.input.organizationId,
           role: 'owner',
         },
       });
 
-      if (!member && context.user.role !== 'admin') {
+      if (!member && user.role !== 'admin') {
         throw new Error('Not authorized to invite members to this organization');
       }
 
@@ -292,11 +292,11 @@ builder.mutationField('inviteMember', (t) =>
       const expirationDate = new Date();
       expirationDate.setDate(expirationDate.getDate() + 7);
 
-      await context.db.insert(tables.invitations).values({
+      await db.insert(tables.invitations).values({
         id: invitationId,
         email: args.input.email,
         organizationId: args.input.organizationId,
-        inviterId: context.user.id,
+        inviterId: user.id,
         role: args.input.role,
         status: 'pending',
         expiresAt: expirationDate,

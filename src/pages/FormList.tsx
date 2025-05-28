@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FileSpreadsheet, Plus, Search, Trash2 } from 'lucide-react';
-import { useGetForms } from '../hooks/useFormManagement';
+import { useGetFormTemplatesQuery } from '../hooks/__generated__/useFormManagement.generated';
 
 export default function FormList() {
   const [searchQuery, setSearchQuery] = useState('');
-  const { data: forms = [], isLoading, error } = useGetForms();
+  const { data: forms } = useGetFormTemplatesQuery();
 
-  const filteredForms = forms.filter(form =>
-    form.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredForms = forms?.formTemplates.filter((form) =>
+    form.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const getStatusBadgeClass = (status: string) => {
@@ -30,12 +30,12 @@ export default function FormList() {
 
   return (
     <div>
-      <div className="flex flex-col mb-6 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">Forms</h1>
-        <div className="flex flex-col gap-3 mt-4 sm:mt-0 sm:flex-row">
+        <div className="mt-4 flex flex-col gap-3 sm:mt-0 sm:flex-row">
           <div className="relative rounded-md shadow-sm">
-            <div className="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-              <Search className="w-4 h-4 text-gray-400" aria-hidden="true" />
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <Search className="h-4 w-4 text-gray-400" aria-hidden="true" />
             </div>
             <input
               type="text"
@@ -46,16 +46,16 @@ export default function FormList() {
             />
           </div>
           <Link to="/forms/new" className="btn btn-primary">
-            <Plus className="mr-1 w-4 h-4" />
+            <Plus className="mr-1 h-4 w-4" />
             Create Form
           </Link>
         </div>
       </div>
 
-      <div className="flow-root mt-8">
-        <div className="overflow-x-auto -mx-4 -my-2 sm:-mx-6 lg:-mx-8">
-          <div className="inline-block py-2 min-w-full align-middle sm:px-6 lg:px-8">
-            <div className="overflow-hidden ring-1 ring-black ring-opacity-5 shadow sm:rounded-lg">
+      <div className="mt-8 flow-root">
+        <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+          <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+            <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
               <table className="min-w-full divide-y divide-gray-300">
                 <thead className="bg-gray-50">
                   <tr>
@@ -73,35 +73,35 @@ export default function FormList() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredForms.map((form) => (
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {filteredForms?.map((form) => (
                     <tr key={form.id}>
-                      <td className="py-4 pr-3 pl-4 text-sm whitespace-nowrap sm:pl-6">
+                      <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
                         <div className="flex items-center">
-                          <div className="flex flex-shrink-0 justify-center items-center w-10 h-10 bg-gray-100 rounded-full">
-                            <FileSpreadsheet className="w-5 h-5 text-gray-600" />
+                          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gray-100">
+                            <FileSpreadsheet className="h-5 w-5 text-gray-600" />
                           </div>
                           <div className="ml-4">
                             <Link to={`/forms/${form.id}`} className="font-medium text-blue-600 hover:text-blue-900">
-                              {form.title}
+                              {form.name}
                             </Link>
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-4 text-sm text-gray-500 whitespace-nowrap">
-                        <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${getStatusBadgeClass(form.status)}`}>
-                          {form.status.replace('_', ' ')}
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                        <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${getStatusBadgeClass(form.id)}`}>
+                          {form.id}
                         </span>
                       </td>
-                      <td className="px-3 py-4 text-sm text-gray-500 whitespace-nowrap">
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                         {new Date(form.createdAt).toLocaleDateString()}
                       </td>
-                      <td className="relative py-4 pr-4 pl-3 text-sm font-medium text-right whitespace-nowrap sm:pr-6">
+                      <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                         <Link to={`/forms/${form.id}`} className="mr-4 text-blue-600 hover:text-blue-900">
                           Edit
                         </Link>
                         <button className="text-red-600 hover:text-red-900">
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </td>
                     </tr>

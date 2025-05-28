@@ -1,36 +1,28 @@
 import SchemaBuilder from '@pothos/core';
 import DrizzlePlugin from '@pothos/plugin-drizzle';
 import ScopeAuthPlugin from '@pothos/plugin-scope-auth';
+import RelayPlugin from '@pothos/plugin-relay';
 import ValidationPlugin from '@pothos/plugin-validation';
 import WithInputPlugin from '@pothos/plugin-with-input';
+import TracingPlugin, { wrapResolver, isRootField } from '@pothos/plugin-tracing';
 import { getTableConfig } from 'drizzle-orm/pg-core';
-import { db } from '../db';
+import { db, Session, User } from '../db';
 import relations from '../schema/relations';
-import { CookieAttributes } from 'lucia';
+import { CookieStore } from '@whatwg-node/cookie-store';
 
 // Create a context type that includes the session and database
 export interface Context {
   db: typeof db;
-  user?: {
-    id: string;
-    email: string;
-    name: string;
-    role: string;
-  } | null;
-  session?: {
-    id: string;
-    userId: string;
-    activeOrganizationId?: string;
-  } | null;
-  req: {
-    cookies: {
-      get: (name: string) => { value: string | undefined };
-      set: (name: string, value: string, attributes: CookieAttributes ) => void;
-    };
-  };
+  user?: User | null;
+  session?: Session | null;
+  cookies: CookieStore;
 }
 
 export type Scalars = {
+  ID: {
+    Input: number | string;
+    Output: number | string;
+  };
   Date: {
     Input: Date;
     Output: Date;
@@ -46,27 +38,59 @@ type DrizzleRelations = typeof relations;
 
 // Create the schema builder instance with plugins
 export const builder = new SchemaBuilder<{
+  Defaults: 'v4';
+  DefaultFieldNullability: false;
+  Tracing: boolean | { formatMessage: (duration: number) => string };
   DrizzleRelations: DrizzleRelations;
   Context: Context;
   Scalars: Scalars;
-  AuthScopes: AuthScopes
+  AuthScopes: AuthScopes;
 }>({
+  defaults: 'v4',
+  defaultFieldNullability: false,
+
   plugins: [
+    TracingPlugin,
     DrizzlePlugin,
     ValidationPlugin,
     ScopeAuthPlugin,
     WithInputPlugin,
+    RelayPlugin,
   ],
+
   drizzle: {
     client: db,
+    relations,
     getTableConfig,
   },
   scopeAuth: {
-    authScopes: async (context) => ({
-      loggedIn: !!context.user,
-      admin: context.user?.role === 'admin',
-    }),
-  }
+    authScopes: async (context) => {
+      return {
+        loggedIn: !!context.user,
+        admin: context.user?.role === 'admin',
+      };
+    },
+  },
+  tracing: {
+    default: (config) => {
+      return isRootField(config) ? true : false;
+    },
+    wrap: (resolve, options, fieldConfig) => {
+      const isRoot = isRootField(fieldConfig);
+      if (isRoot) {
+        return resolve;
+      }
+      return wrapResolver(resolve, (error, duration) => {
+        const message =
+          typeof options === 'object'
+            ? options.formatMessage(duration)
+            : `Executed resolver ${fieldConfig.parentType}.${fieldConfig.name} in ${duration}ms`;
+
+        console.log(message);
+        return error;
+      });
+    },
+  },
 });
 
 // Define a date scalar for handling date fields

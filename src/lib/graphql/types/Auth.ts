@@ -5,23 +5,21 @@ import { lucia } from '../../auth';
 import bcrypt from 'bcryptjs';
 
 // Login input type
-export const LoginInputType
-  = builder.inputType('LoginInput', {
-    fields: (t) => ({
-      email: t.string({ required: true, validate: { email: true } }),
-      password: t.string({ required: true, validate: { minLength: 8 } }),
-    }),
-  });
+export const LoginInputType = builder.inputType('LoginInput', {
+  fields: (t) => ({
+    email: t.string({ required: true, validate: { email: true } }),
+    password: t.string({ required: true, validate: { minLength: 8 } }),
+  }),
+});
 
 // Register input type
-export const RegisterInput
-  = builder.inputType('RegisterInput', {
-    fields: (t) => ({
-      name: t.string({ required: true }),
-      email: t.string({ required: true, validate: { email: true } }),
-      password: t.string({ required: true, validate: { minLength: 8 } }),
-    }),
-  });
+export const RegisterInput = builder.inputType('RegisterInput', {
+  fields: (t) => ({
+    name: t.string({ required: true }),
+    email: t.string({ required: true, validate: { email: true } }),
+    password: t.string({ required: true, validate: { minLength: 8 } }),
+  }),
+});
 
 // Login mutation
 builder.mutationField(
@@ -32,9 +30,9 @@ builder.mutationField(
       args: {
         input: t.arg({ type: LoginInputType, required: true }),
       },
-      resolve: async (_, { input }, context) => {
+      resolve: async (_, { input }, { db, cookies, session }) => {
         // Find the user by email
-        const user = await context.db.query.users.findFirst({
+        const user = await db.query.users.findFirst({
           where: { email: input.email },
         });
 
@@ -43,7 +41,7 @@ builder.mutationField(
         }
 
         // Find the user's account with password
-        const account = await context.db.query.accounts.findFirst({
+        const account = await db.query.accounts.findFirst({
           where: { userId: user.id },
         });
 
@@ -58,15 +56,31 @@ builder.mutationField(
         }
 
         // Create a new session
-        const session = await lucia.createSession(user.id, {
-          // Store active organization if user has one
+        const newSession = await lucia.createSession(user.id, {
+          id: crypto.randomUUID(),
           token: crypto.randomUUID(),
-          activeOrganizationId: context.session?.activeOrganizationId || undefined
+          activeOrganizationId: session?.activeOrganizationId || null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userId: user.id,
+          expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+          impersonatedBy: null,
+          ipAddress: null,
+          userAgent: null,
         });
 
         // Set the session cookie
-        const cookie = lucia.createSessionCookie(session.id);
-        context.req.cookies.set(cookie.name, cookie.value, cookie.attributes);
+        const cookie = lucia.createSessionCookie(newSession.id);
+
+        cookies.set({
+          name: cookie.name,
+          value: cookie.value,
+          domain: cookie.attributes.domain || null,
+          expires: cookie.attributes.expires || null,
+          secure: cookie.attributes.secure || false,
+          sameSite: cookie.attributes.sameSite || 'lax',
+          httpOnly: cookie.attributes.httpOnly || true,
+        });
 
         return user;
       },
@@ -82,9 +96,9 @@ builder.mutationField(
       args: {
         input: t.arg({ type: RegisterInput, required: true }),
       },
-      resolve: async (_, { input }, context) => {
+      resolve: async (_, { input }, { db, cookies, session }) => {
         // Check if user already exists
-        const existingUser = await context.db.query.users.findFirst({
+        const existingUser = await db.query.users.findFirst({
           where: { email: input.email },
         });
 
@@ -95,7 +109,7 @@ builder.mutationField(
         const userId = crypto.randomUUID();
 
         // Create the new user
-        await context.db.insert(tables.users).values({
+        await db.insert(tables.users).values({
           id: userId,
           name: input.name,
           email: input.email,
@@ -108,7 +122,7 @@ builder.mutationField(
         const hashedPassword = await bcrypt.hash(input.password, 10);
 
         // Create account with hashed password
-        await context.db.insert(tables.accounts).values({
+        await db.insert(tables.accounts).values({
           id: crypto.randomUUID(),
           userId: userId,
           providerId: 'credentials',
@@ -119,14 +133,34 @@ builder.mutationField(
         });
 
         // Create a session
-        const session = await lucia.createSession(userId, {});
+        const newSession = await lucia.createSession(userId, {
+          id: crypto.randomUUID(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userId: userId,
+          activeOrganizationId: session?.activeOrganizationId || null,
+          expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+          token: crypto.randomUUID(),
+          impersonatedBy: null,
+          ipAddress: null,
+          userAgent: null,
+        });
 
         // Set the session cookie
-        const { name, value, attributes } = lucia.createSessionCookie(session.id);
-        context.req.cookies.set(name, value, attributes);
+        const { name, value, attributes } = lucia.createSessionCookie(newSession.id);
+
+        cookies.set({
+          name,
+          value,
+          domain: attributes.domain || null,
+          expires: attributes.expires || null,
+          secure: attributes.secure || false,
+          sameSite: attributes.sameSite || 'lax',
+          httpOnly: attributes.httpOnly || true,
+        });
 
         // Return the created user
-        const newUser = await context.db.query.users.findFirst({
+        const newUser = await db.query.users.findFirst({
           where: { id: userId },
         });
 
@@ -145,17 +179,26 @@ builder.mutationField('logout', (t) =>
     authScopes: {
       loggedIn: true,
     },
-    resolve: async (_, __, context) => {
+    resolve: async (_, __, { cookies }) => {
       // Get the session cookie
-      const sessionId = context.req.cookies.get(lucia.sessionCookieName)?.value;
+      const sessionId = await cookies.get(lucia.sessionCookieName);
 
       if (sessionId) {
         // Invalidate the session
-        await lucia.invalidateSession(sessionId);
+        await lucia.invalidateSession(sessionId.value);
 
         // Remove the cookie
         const { name, value, attributes } = lucia.createBlankSessionCookie();
-        context.req.cookies.set(name, value, attributes);
+
+        cookies.set({
+          name,
+          value,
+          domain: attributes.domain || null,
+          expires: attributes.expires || null,
+          secure: attributes.secure || false,
+          sameSite: attributes.sameSite || 'lax',
+          httpOnly: attributes.httpOnly || true,
+        });
       }
 
       return true;

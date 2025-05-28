@@ -4,34 +4,20 @@ import { builder } from '../builder';
 import { UserType } from './User';
 
 // Define Comment type
-export const CommentType = builder.drizzleObject('comments', {
+export const CommentType = builder.drizzleNode('comments', {
   name: 'Comment',
+  id: { column: (comment) => comment.id },
   fields: (t) => ({
-    id: t.string({
-      resolve: (comment) => comment.id,
-    }),
-    content: t.string({
-      resolve: (comment) => comment.content,
-    }),
-    createdAt: t.field({
-      type: 'Date',
-      resolve: (comment) => comment.createdAt,
-    }),
-    memberId: t.string({
-      resolve: (comment) => comment.memberId,
-    }),
-    reviewFlowId: t.string({
-      resolve: (comment) => comment.reviewFlowId,
-    }),
-    formFieldId: t.string({
-      nullable: true,
-      resolve: (comment) => comment.formFieldId || null,
-    }),
+    content: t.exposeString('content'),
+    createdAt: t.expose('createdAt', { type: 'Date' }),
+    memberId: t.exposeString('memberId'),
+    reviewFlowId: t.exposeString('reviewFlowId'),
+    formFieldId: t.exposeString('formFieldId', { nullable: true }),
     user: t.field({
       type: UserType,
-      resolve: async (comment, _, context) => {
+      resolve: async (comment, _, { db }) => {
         // First find the member to get user ID
-        const member = await context.db.query.members.findFirst({
+        const member = await db.query.members.findFirst({
           where: { id: comment.memberId },
         });
 
@@ -40,7 +26,7 @@ export const CommentType = builder.drizzleObject('comments', {
         }
 
         // Then find the user
-        const user = await context.db.query.users.findFirst({
+        const user = await db.query.users.findFirst({
           where: { id: member.userId },
         });
 
@@ -168,7 +154,6 @@ builder.mutationField('addComment', (t) =>
       await context.db
         .insert(tables.comments)
         .values(commentData)
-        .returning();
 
       return commentData;
     },

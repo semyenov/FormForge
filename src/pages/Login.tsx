@@ -41,12 +41,12 @@ export default function Login() {
   };
 
   return (
-    <div className="flex flex-col justify-center px-6 py-12 min-h-screen bg-gray-50 lg:px-8">
+    <div className="flex min-h-screen flex-col justify-center bg-gray-50 px-6 py-12 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-sm">
         <div className="flex justify-center">
-          <Layers className="w-auto h-10 text-blue-600" />
+          <Layers className="h-10 w-auto text-blue-600" />
         </div>
-        <h2 className="mt-6 text-2xl font-bold tracking-tight leading-9 text-center text-gray-900">
+        <h2 className="mt-6 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900">
           Sign in to FormFlow
         </h2>
       </div>
@@ -77,7 +77,7 @@ export default function Login() {
           </div>
 
           <div>
-            <div className="flex justify-between items-center">
+            <div className="flex items-center justify-between">
               <label
                 htmlFor="password"
                 className="block text-sm font-medium leading-6 text-gray-900"
@@ -113,14 +113,14 @@ export default function Login() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full btn btn-primary"
+              className="btn btn-primary w-full"
             >
               {isLoading ? "Signing in..." : "Sign in"}
             </button>
           </div>
         </form>
 
-        <p className="mt-10 text-sm text-center text-gray-500">
+        <p className="mt-10 text-center text-sm text-gray-500">
           Not a member?{" "}
           <Link
             to="/register"

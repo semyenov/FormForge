@@ -12,41 +12,21 @@ const reviewFlowStatusEnum = builder.enumType('ReviewFlowStatus', {
 });
 
 // Define ReviewFlow type
-const ReviewFlowType = builder.drizzleObject('reviewFlows', {
+const ReviewFlowType = builder.drizzleNode('reviewFlows', {
   name: 'ReviewFlow',
+  id: { column: (flow) => flow.id },
   fields: (t) => ({
-    id: t.string({
-      resolve: (flow) => flow.id,
-    }),
-    status: t.field({
-      type: reviewFlowStatusEnum,
-      resolve: (flow) => flow.status,
-    }),
-    createdAt: t.field({
-      type: 'Date',
-      resolve: (flow) => flow.createdAt,
-    }),
-    updatedAt: t.field({
-      type: 'Date',
-      resolve: (flow) => flow.updatedAt,
-    }),
-    version: t.int({
-      resolve: (flow) => flow.version,
-    }),
-    formId: t.string({
-      resolve: (flow) => flow.formId,
-    }),
-    organizationId: t.string({
-      resolve: (flow) => flow.organizationId,
-    }),
-    lastModifiedBy: t.string({
-      nullable: true,
-      resolve: (flow) => flow.lastModifiedBy || null,
-    }),
+    status: t.expose('status', { type: reviewFlowStatusEnum }),
+    createdAt: t.expose('createdAt', { type: 'Date' }),
+    updatedAt: t.expose('updatedAt', { type: 'Date' }),
+    version: t.exposeInt('version'),
+    formId: t.exposeString('formId'),
+    organizationId: t.exposeString('organizationId'),
+    lastModifiedBy: t.exposeString('lastModifiedBy', { nullable: true }),
     form: t.field({
       type: FormType,
-      resolve: async (flow, _, context) => {
-        const form = await context.db.query.forms.findFirst({
+      resolve: async (flow, _, { db }) => {
+        const form = await db.query.forms.findFirst({
           where: { id: flow.formId },
         });
 
@@ -59,10 +39,11 @@ const ReviewFlowType = builder.drizzleObject('reviewFlows', {
     }),
     comments: t.field({
       type: [CommentType],
-      resolve: async (flow, _, context) => {
-        const comments = await context.db.select().from(tables.comments)
-          .where(eq(tables.comments.reviewFlowId, flow.id))
-          .orderBy(tables.comments.createdAt);
+      resolve: async (flow, _, { db }) => {
+        const comments = await db.query.comments.findMany({
+          where: { reviewFlowId: flow.id },
+          orderBy: { createdAt: 'asc' },
+        });
 
         return comments;
       },
@@ -95,25 +76,25 @@ builder.queryField('organizationReviewFlows', (t) =>
     authScopes: {
       loggedIn: true,
     },
-    resolve: async (_, args, context) => {
-      if (!context.user) {
+    resolve: async (_, args, { db, user }) => {
+      if (!user) {
         throw new Error('Not authenticated');
       }
 
       // Check if user is a member of this organization
-      const member = await context.db.query.members.findFirst({
+      const member = await db.query.members.findFirst({
         where: {
-          userId: context.user.id,
+          userId: user.id,
           organizationId: args.organizationId,
         },
       });
 
-      if (!member && context.user.role !== 'admin') {
+      if (!member && user.role !== 'admin') {
         throw new Error('Not a member of this organization');
       }
 
       // Build query
-      const query = context.db.query.reviewFlows.findMany({
+      const query = db.query.reviewFlows.findMany({
         columns: {
           id: true,
           status: true,
@@ -148,12 +129,12 @@ builder.queryField('reviewFlow', (t) =>
     authScopes: {
       loggedIn: true,
     },
-    resolve: async (_, args, context) => {
-      if (!context.user) {
+    resolve: async (_, args, { db, user }) => {
+      if (!user) {
         throw new Error('Not authenticated');
       }
 
-      const reviewFlow = await context.db.query.reviewFlows.findFirst({
+      const reviewFlow = await db.query.reviewFlows.findFirst({
         where: { id: args.id },
       });
 
@@ -162,14 +143,14 @@ builder.queryField('reviewFlow', (t) =>
       }
 
       // Check if user is a member of this organization
-      const member = await context.db.query.members.findFirst({
+      const member = await db.query.members.findFirst({
         where: {
-          userId: context.user.id,
+          userId: user.id,
           organizationId: reviewFlow.organizationId,
         },
       });
 
-      if (!member && context.user.role !== 'admin') {
+      if (!member && user.role !== 'admin') {
         throw new Error('Not authorized to view this review flow');
       }
 
@@ -188,13 +169,13 @@ builder.queryField('formReviewFlows', (t) =>
     authScopes: {
       loggedIn: true,
     },
-    resolve: async (_, args, context) => {
-      if (!context.user) {
+    resolve: async (_, args, { db, user }) => {
+      if (!user) {
         throw new Error('Not authenticated');
       }
 
       // Get form to check organization
-      const form = await context.db.query.forms.findFirst({
+      const form = await db.query.forms.findFirst({
         where: { id: args.formId },
       });
 
@@ -203,20 +184,21 @@ builder.queryField('formReviewFlows', (t) =>
       }
 
       // Check if user is a member of this organization
-      const member = await context.db.query.members.findFirst({
+      const member = await db.query.members.findFirst({
         where: {
-          userId: context.user.id,
+          userId: user.id,
           organizationId: form.organizationId,
         },
       });
 
-      if (!member && context.user.role !== 'admin') {
+      if (!member && user.role !== 'admin') {
         throw new Error('Not authorized to view review flows for this form');
       }
 
-      return context.db.select().from(tables.reviewFlows)
-        .where(eq(tables.reviewFlows.formId, args.formId))
-        .orderBy(tables.reviewFlows.createdAt);
+      return db.query.reviewFlows.findMany({
+        where: { formId: args.formId },
+        orderBy: { createdAt: 'asc' },
+      });
     },
   })
 );
@@ -231,13 +213,13 @@ builder.mutationField('createReviewFlow', (t) =>
     authScopes: {
       loggedIn: true,
     },
-    resolve: async (_, args, context) => {
-      if (!context.session?.activeOrganizationId) {
+    resolve: async (_, args, { session, db, user }) => {
+      if (!session?.activeOrganizationId) {
         throw new Error('Not authenticated or no active organization');
       }
 
       // Get form to check organization
-      const form = await context.db.query.forms.findFirst({
+      const form = await db.query.forms.findFirst({
         where: { id: args.input.formId },
       });
 
@@ -246,15 +228,15 @@ builder.mutationField('createReviewFlow', (t) =>
       }
 
       // Check if form belongs to the active organization
-      if (form.organizationId !== context.session.activeOrganizationId) {
+      if (form.organizationId !== session.activeOrganizationId) {
         throw new Error('Form does not belong to your active organization');
       }
 
       // Check if user is a reviewer or owner in this organization
-      const member = await context.db.query.members.findFirst({
+      const member = await db.query.members.findFirst({
         where: {
-          userId: context.user?.id,
-          organizationId: context.session.activeOrganizationId,
+          userId: user?.id,
+          organizationId: session.activeOrganizationId,
         },
       });
 
@@ -262,7 +244,7 @@ builder.mutationField('createReviewFlow', (t) =>
         throw new Error('You are not a member of this organization');
       }
 
-      if (member.role !== 'reviewer' && member.role !== 'owner' && context.user?.role !== 'admin') {
+      if (member.role !== 'reviewer' && member.role !== 'owner' && user?.role !== 'admin') {
         throw new Error('You do not have permission to create review flows');
       }
 
@@ -272,7 +254,7 @@ builder.mutationField('createReviewFlow', (t) =>
       const reviewFlowData = {
         id: reviewFlowId,
         formId: args.input.formId,
-        organizationId: context.session.activeOrganizationId,
+        organizationId: session.activeOrganizationId,
         status: 'open',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -280,7 +262,7 @@ builder.mutationField('createReviewFlow', (t) =>
         version: 1,
       } as const;
 
-      await context.db
+      await db
         .insert(tables.reviewFlows)
         .values(reviewFlowData)
         .returning();
@@ -301,13 +283,13 @@ builder.mutationField('updateReviewFlow', (t) =>
     authScopes: {
       loggedIn: true,
     },
-    resolve: async (_, args, context) => {
-      if (!context.user) {
+    resolve: async (_, args, { user, db }) => {
+      if (!user) {
         throw new Error('Not authenticated');
       }
 
       // Find the review flow
-      const reviewFlow = await context.db.query.reviewFlows.findFirst({
+      const reviewFlow = await db.query.reviewFlows.findFirst({
         where: { id: args.id },
       });
 
@@ -316,25 +298,25 @@ builder.mutationField('updateReviewFlow', (t) =>
       }
 
       // Check if user is a reviewer or owner in this organization
-      const member = await context.db.query.members.findFirst({
+      const member = await db.query.members.findFirst({
         where: {
-          userId: context.user.id,
+          userId: user.id,
           organizationId: reviewFlow.organizationId,
         },
       });
 
-      if (!member && context.user.role !== 'admin') {
+      if (!member && user.role !== 'admin') {
         throw new Error('Not authorized to update this review flow');
       }
 
-      if (member && member.role !== 'reviewer' && member.role !== 'owner' && context.user.role !== 'admin') {
+      if (member && member.role !== 'reviewer' && member.role !== 'owner' && user.role !== 'admin') {
         throw new Error('You do not have permission to update review flows');
       }
 
       // Update the review flow
       const updateValues: Record<string, any> = {
         updatedAt: new Date(),
-        lastModifiedBy: member ? member.id : context.user.id,
+        lastModifiedBy: member ? member.id : user.id,
         version: reviewFlow.version + 1,
       };
 
@@ -342,12 +324,12 @@ builder.mutationField('updateReviewFlow', (t) =>
         updateValues.status = args.input.status;
       }
 
-      await context.db.update(tables.reviewFlows)
+      await db.update(tables.reviewFlows)
         .set(updateValues)
         .where(eq(tables.reviewFlows.id, args.id));
 
       // Return the updated review flow
-      const updatedReviewFlow = await context.db.query.reviewFlows.findFirst({
+      const updatedReviewFlow = await db.query.reviewFlows.findFirst({
         where: { id: args.id },
       });
 

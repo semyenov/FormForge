@@ -1,71 +1,8 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Building2, Plus, Settings, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
-import { gql } from "graphql-request";
-import graphqlClient from "../hooks/useGraphqlClient";
-
-interface Organization {
-  id: string;
-  name: string;
-  slug?: string | null;
-  logo?: string | null;
-  createdAt: Date;
-}
-
-interface GetOrganizationsResponse {
-  organizations: Organization[];
-}
-
-interface SetActiveOrganizationResponse {
-  setActiveOrganization: boolean;
-}
-
-interface CreateOrganizationResponse {
-  createOrganization: Organization;
-}
-
-async function fetchOrganizations() {
-  const response = await graphqlClient.request<GetOrganizationsResponse>(gql`
-    query GetOrganizations {
-      organizations {
-        id
-        name
-        slug
-        logo
-        createdAt
-      }
-    }
-  `);
-
-  return response.organizations;
-}
-
-async function setActiveOrganization(organizationId: string) {
-  const response = await graphqlClient.request<SetActiveOrganizationResponse>(gql`
-    mutation SetActiveOrganization($organizationId: String!) {
-      setActiveOrganization(organizationId: $organizationId)
-    }
-  `, { organizationId });
-
-  return response.setActiveOrganization;
-}
-
-async function createOrganization(input: { name: string; slug?: string; logo?: string }) {
-  const response = await graphqlClient.request<CreateOrganizationResponse>(gql`
-    mutation CreateOrganization($input: CreateOrganizationInput!) {
-      createOrganization(input: $input) {
-        id
-        name
-        slug
-        createdAt
-      }
-    }
-  `, { input });
-
-  return response.createOrganization;
-}
+import { useCreateOrganizationMutation, useGetOrganizationsQuery, useSetActiveOrganizationMutation } from "./__generated__/OrganizationList.generated";
 
 export default function OrganizationList() {
   const { session, refetchUser } = useAuth();
@@ -74,26 +11,19 @@ export default function OrganizationList() {
   const [newOrgSlug, setNewOrgSlug] = useState("");
   const [slugError, setSlugError] = useState("");
   const [nameError, setNameError] = useState("");
-  const queryClient = useQueryClient();
 
-  const {
-    data: organizations = [],
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ["organizations"],
-    queryFn: fetchOrganizations,
-  });
+  const { data: organizationsData } = useGetOrganizationsQuery();
+  const organizations = organizationsData?.organizations;
 
-  const createOrgMutation = useMutation({
-    mutationFn: createOrganization,
-    onSuccess: (newOrg) => {
-      queryClient.invalidateQueries({ queryKey: ["organizations"] });
-
+  const [createOrgMutation, { loading: createOrgLoading, error: createOrgError }] = useCreateOrganizationMutation({
+    onCompleted: (newOrg) => {
       // Set the new organization as active
-      setActiveOrgMutation.mutate(newOrg.id, {
-        onSuccess: () => {
-          toast.success(`Organization "${newOrg.name}" created and set as active`);
+      setActiveOrgMutation({
+        variables: {
+          organizationId: newOrg.createOrganization.id,
+        },
+        onCompleted: () => {
+          toast.success(`Organization "${newOrg.createOrganization.name}" created and set as active`);
           refetchUser();
         }
       });
@@ -109,9 +39,8 @@ export default function OrganizationList() {
     },
   });
 
-  const setActiveOrgMutation = useMutation({
-    mutationFn: setActiveOrganization,
-    onSuccess: () => {
+  const [setActiveOrgMutation, { loading: setActiveOrgLoading, error: setActiveOrgError }] = useSetActiveOrganizationMutation({
+    onCompleted: () => {
       refetchUser();
       toast.success("Active organization updated");
     },
@@ -154,32 +83,40 @@ export default function OrganizationList() {
     e.preventDefault();
 
     if (validateForm()) {
-      createOrgMutation.mutate({
-        name: newOrgName,
-        slug: newOrgSlug || undefined,
+      createOrgMutation({
+        variables: {
+          input: {
+            name: newOrgName,
+            slug: newOrgSlug || undefined,
+          },
+        },
       });
     }
   };
 
   const handleSetActive = (organizationId: string) => {
-    setActiveOrgMutation.mutate(organizationId);
+    setActiveOrgMutation({
+      variables: {
+        organizationId,
+      },
+    });
   };
 
-  if (isLoading) {
+  if (createOrgLoading || setActiveOrgLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="w-12 h-12 rounded-full border-t-2 border-b-2 border-blue-500 animate-spin"></div>
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-t-2 border-blue-500"></div>
       </div>
     );
   }
 
-  if (error) {
+  if (createOrgError || setActiveOrgError) {
     return (
-      <div className="p-4 mb-6 bg-red-50 border-l-4 border-red-500">
+      <div className="mb-6 border-l-4 border-red-500 bg-red-50 p-4">
         <div className="flex">
           <div className="flex-shrink-0">
             <svg
-              className="w-5 h-5 text-red-500"
+              className="h-5 w-5 text-red-500"
               viewBox="0 0 20 20"
               fill="currentColor"
             >
@@ -193,7 +130,7 @@ export default function OrganizationList() {
           <div className="ml-3">
             <p className="text-sm text-red-700">
               Failed to load organizations:{" "}
-              {error instanceof Error ? error.message : "Unknown error"}
+              {createOrgError instanceof Error ? createOrgError.message : "Unknown error"}
             </p>
           </div>
         </div>
@@ -203,20 +140,20 @@ export default function OrganizationList() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">Organizations</h1>
         <button
           onClick={() => setIsCreating(true)}
           className="btn btn-primary"
           disabled={isCreating}
         >
-          <Plus className="mr-1 w-4 h-4" />
+          <Plus className="mr-1 h-4 w-4" />
           New Organization
         </button>
       </div>
 
       {isCreating && (
-        <div className="p-4 mb-6 bg-white rounded-lg border border-gray-200 shadow">
+        <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow">
           <h2 className="mb-4 text-lg font-medium">Create New Organization</h2>
           <form onSubmit={handleCreateOrg}>
             <div className="space-y-4">
@@ -248,8 +185,8 @@ export default function OrganizationList() {
                 >
                   Slug (optional)
                 </label>
-                <div className="flex mt-1 rounded-md shadow-sm">
-                  <span className="inline-flex items-center px-3 text-sm text-gray-500 bg-gray-50 rounded-l-md border border-r-0 border-gray-300">
+                <div className="mt-1 flex rounded-md shadow-sm">
+                  <span className="inline-flex items-center rounded-l-md border border-r-0 border-gray-300 bg-gray-50 px-3 text-sm text-gray-500">
                     formforge.com/
                   </span>
                   <input
@@ -290,9 +227,9 @@ export default function OrganizationList() {
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={createOrgMutation.isPending || !newOrgName}
+                  disabled={createOrgLoading || !newOrgName}
                 >
-                  {createOrgMutation.isPending
+                  {createOrgLoading
                     ? "Creating..."
                     : "Create Organization"}
                 </button>
@@ -303,23 +240,23 @@ export default function OrganizationList() {
       )}
 
       <div className="overflow-hidden bg-white shadow sm:rounded-md">
-        {organizations.length > 0 ? (
+        {organizations && organizations.length > 0 ? (
           <ul role="list" className="divide-y divide-gray-200">
-            {organizations.map((org: Organization) => (
+            {organizations.map((org) => (
               <li key={org.id}>
                 <div className="px-4 py-4 sm:px-6">
-                  <div className="flex justify-between items-center">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       <div className="flex-shrink-0">
                         {org.logo ? (
                           <img
-                            className="w-12 h-12 rounded"
+                            className="h-12 w-12 rounded"
                             src={org.logo}
                             alt={org.name}
                           />
                         ) : (
-                          <div className="flex justify-center items-center w-12 h-12 bg-blue-100 rounded">
-                            <Building2 className="w-6 h-6 text-blue-600" />
+                          <div className="flex h-12 w-12 items-center justify-center rounded bg-blue-100">
+                            <Building2 className="h-6 w-6 text-blue-600" />
                           </div>
                         )}
                       </div>
@@ -336,31 +273,31 @@ export default function OrganizationList() {
                     </div>
                     <div className="flex space-x-2">
                       {session?.activeOrganizationId === org.id ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
                           Active
                         </span>
                       ) : (
                         <button
                           onClick={() => handleSetActive(org.id)}
-                          className="inline-flex items-center px-2.5 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50"
-                          disabled={setActiveOrgMutation.isPending}
+                          className="inline-flex items-center rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                          disabled={setActiveOrgLoading}
                         >
                           Set Active
                         </button>
                       )}
                       <button className="inline-flex items-center text-gray-400 hover:text-gray-500">
-                        <Settings className="w-5 h-5" />
+                        <Settings className="h-5 w-5" />
                       </button>
                     </div>
                   </div>
                   <div className="mt-2 sm:flex sm:justify-between">
                     <div className="sm:flex">
                       <p className="flex items-center text-sm text-gray-500">
-                        <Users className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" />
+                        <Users className="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400" />
                         Members
                       </p>
                     </div>
-                    <div className="flex items-center mt-2 text-sm text-gray-500 sm:mt-0">
+                    <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
                       <p>
                         Created{" "}
                         {new Date(org.createdAt).toLocaleDateString(undefined, {
@@ -377,7 +314,7 @@ export default function OrganizationList() {
           </ul>
         ) : (
           <div className="px-4 py-12 text-center">
-            <Building2 className="mx-auto w-12 h-12 text-gray-400" />
+            <Building2 className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">
               No organizations
             </h3>
@@ -387,9 +324,9 @@ export default function OrganizationList() {
             <div className="mt-6">
               <button
                 onClick={() => setIsCreating(true)}
-                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md border border-transparent shadow-sm hover:bg-blue-700"
+                className="inline-flex items-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
               >
-                <Plus className="mr-2 -ml-1 w-5 h-5" aria-hidden="true" />
+                <Plus className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
                 New Organization
               </button>
             </div>

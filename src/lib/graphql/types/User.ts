@@ -1,10 +1,14 @@
 import { builder } from '../builder';
 
-// Define User type
-export const UserType = builder.drizzleObject('users', {
+export const UserType = builder.drizzleNode('users', {
   name: 'User',
+  id: { column: (user) => user.id },
   fields: (t) => ({
-    id: t.exposeID('id'),
+    banExpires: t.expose('banExpires', { type: 'Date', nullable: true }),
+    banned: t.exposeBoolean('banned', { nullable: true }),
+    banReason: t.exposeString('banReason', { nullable: true }),
+    emailVerified: t.exposeBoolean('emailVerified', { nullable: true }),
+    image: t.exposeString('image', { nullable: true }),
     name: t.exposeString('name'),
     email: t.exposeString('email'),
     role: t.exposeString('role'),
@@ -20,20 +24,20 @@ builder.queryField('me', (t) =>
     authScopes: {
       loggedIn: true,
     },
-    resolve: async (_, __, context) => {
-      if (!context.user) {
+    resolve: async (_, __, { db, user }) => {
+      if (!user) {
         throw new Error('Not authenticated');
       }
 
-      const user = await context.db.query.users.findFirst({
-        where: { id: context.user.id },
+      const foundUser = await db.query.users.findFirst({
+        where: { id: user.id },
       });
 
-      if (!user) {
+      if (!foundUser) {
         throw new Error('User not found');
       }
 
-      return user;
+      return foundUser;
     },
   })
 );
@@ -45,8 +49,9 @@ builder.queryField('users', (t) =>
     authScopes: {
       admin: true,
     },
-    resolve: async (_, __, context) => {
-      return context.db.query.users.findMany();
+    resolve: async (_, __, { db }) => {
+      const foundUsers = await db.query.users.findMany();
+      return foundUsers;
     },
   })
 );
