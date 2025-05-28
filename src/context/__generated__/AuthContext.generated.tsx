@@ -11,21 +11,21 @@ export type SessionQuery = { __typename?: 'Query', session: { __typename?: 'Sess
 export type MeQueryVariables = Types.Exact<{ [key: string]: never; }>;
 
 
-export type MeQuery = { __typename?: 'Query', me: { __typename?: 'User', id: string, name: string, email: string, role: string, emailVerified?: boolean | null, banExpires?: any | null, banReason?: string | null, banned?: boolean | null, createdAt: any, updatedAt: any } };
+export type MeQuery = { __typename?: 'Query', me: { __typename?: 'User', id: string, name: string, email: string, role: string, emailVerified?: boolean | null, banExpires?: any | null, banReason?: string | null, banned?: boolean | null, createdAt: any, updatedAt: any, members: Array<{ __typename?: 'Member', id: string, organization: { __typename?: 'Organization', id: string, name: string } }> } };
 
 export type LoginMutationVariables = Types.Exact<{
   input: Types.LoginInput;
 }>;
 
 
-export type LoginMutation = { __typename?: 'Mutation', login: { __typename?: 'User', id: string, name: string, email: string, role: string, emailVerified?: boolean | null, banExpires?: any | null, banReason?: string | null, banned?: boolean | null, createdAt: any, updatedAt: any } };
+export type LoginMutation = { __typename?: 'Mutation', login: { __typename?: 'User', id: string, name: string, email: string, role: string, emailVerified?: boolean | null, banExpires?: any | null, banReason?: string | null, banned?: boolean | null, createdAt: any, updatedAt: any, members: Array<{ __typename?: 'Member', id: string, organization: { __typename?: 'Organization', id: string, name: string } }> } };
 
 export type RegisterMutationVariables = Types.Exact<{
   input: Types.RegisterInput;
 }>;
 
 
-export type RegisterMutation = { __typename?: 'Mutation', register: { __typename?: 'User', id: string, name: string, email: string, role: string, banExpires?: any | null, banReason?: string | null, emailVerified?: boolean | null, banned?: boolean | null, createdAt: any, updatedAt: any } };
+export type RegisterMutation = { __typename?: 'Mutation', register: { __typename?: 'User', id: string, name: string, email: string, role: string, banExpires?: any | null, banReason?: string | null, emailVerified?: boolean | null, banned?: boolean | null, createdAt: any, updatedAt: any, members: Array<{ __typename?: 'Member', id: string, organization: { __typename?: 'Organization', id: string, name: string } }> } };
 
 export type LogoutMutationVariables = Types.Exact<{ [key: string]: never; }>;
 
@@ -94,6 +94,13 @@ export const MeDocument = gql`
     banned
     createdAt
     updatedAt
+    members {
+      id
+      organization {
+        id
+        name
+      }
+    }
   }
 }
     `;
@@ -142,6 +149,13 @@ export const LoginDocument = gql`
     banned
     createdAt
     updatedAt
+    members {
+      id
+      organization {
+        id
+        name
+      }
+    }
   }
 }
     `;
@@ -184,6 +198,13 @@ export const RegisterDocument = gql`
     banned
     createdAt
     updatedAt
+    members {
+      id
+      organization {
+        id
+        name
+      }
+    }
   }
 }
     `;

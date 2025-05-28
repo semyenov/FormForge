@@ -1,14 +1,15 @@
+import { Session, User } from '@/__generated__/types.generated';
 import SchemaBuilder from '@pothos/core';
 import DrizzlePlugin from '@pothos/plugin-drizzle';
-import ScopeAuthPlugin from '@pothos/plugin-scope-auth';
 import RelayPlugin from '@pothos/plugin-relay';
+import ScopeAuthPlugin from '@pothos/plugin-scope-auth';
+import TracingPlugin, { isRootField, wrapResolver } from '@pothos/plugin-tracing';
 import ValidationPlugin from '@pothos/plugin-validation';
 import WithInputPlugin from '@pothos/plugin-with-input';
-import TracingPlugin, { wrapResolver, isRootField } from '@pothos/plugin-tracing';
-import { getTableConfig } from 'drizzle-orm/pg-core';
-import { db, Session, User } from '../db';
-import relations from '../schema/relations';
 import { CookieStore } from '@whatwg-node/cookie-store';
+import { getTableConfig } from 'drizzle-orm/pg-core';
+import { db } from '../db';
+import relations from '../schema/relations';
 
 // Create a context type that includes the session and database
 export interface Context {

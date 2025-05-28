@@ -151,8 +151,10 @@ input LoginInput {
 type Member implements Node {
   createdAt: Date!
   id: ID!
+  organization: Organization!
+  organizationId: String!
   role: MemberRole!
-  user: User!
+  userId: String!
 }
 
 enum MemberRole {
@@ -281,6 +283,7 @@ type User implements Node {
   emailVerified: Boolean
   id: ID!
   image: String
+  members: [Member!]!
   name: String!
   role: String!
   updatedAt: Date!

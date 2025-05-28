@@ -1,38 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { tables } from '../../schema';
 import { builder } from '../builder';
-import { UserType } from './User';
-
-const memberRoleEnum = builder.enumType('MemberRole', {
-  values: {
-    owner: { value: 'owner' },
-    reviewer: { value: 'reviewer' },
-    executor: { value: 'executor' },
-    member: { value: 'member' },
-  },
-});
-
-// Define Member type
-const MemberType = builder.drizzleNode('members', {
-  name: 'Member',
-  id: { column: (member) => member.id },
-  fields: (t) => ({
-    role: t.expose('role', { type: memberRoleEnum }),
-    createdAt: t.expose('createdAt', { type: 'Date' }),
-    user: t.field({
-      type: UserType,
-      resolve: async (member, _, context) => {
-        const user = await context.db.query.users.findFirst({
-          where: { id: member.userId },
-        });
-        if (!user) {
-          throw new Error('User not found');
-        }
-        return user;
-      },
-    }),
-  }),
-});
+import { MemberType, memberRoleEnum } from './Member';
 
 // Define Organization type
 export const OrganizationType = builder.drizzleNode('organizations', {
@@ -175,6 +144,7 @@ builder.mutationField('createOrganization', (t) =>
         slug: args.input.slug || null,
         logo: args.input.logo || null,
         createdAt: new Date(),
+        metadata: JSON.stringify({}),
       });
 
       // Return the created organization
@@ -188,15 +158,18 @@ builder.mutationField('createOrganization', (t) =>
 
       // Add the current user as an owner
       const memberId = crypto.randomUUID();
-      await db.insert(tables.members).values({
-        id: memberId,
-        userId: user.id,
-        organizationId: organizationId,
-        role: 'owner',
-        createdAt: new Date(),
-        lastModifiedBy: user.id,
-        version: 1,
-      });
+
+      await db
+        .insert(tables.members)
+        .values({
+          id: memberId,
+          userId: user.id,
+          organizationId: organizationId,
+          role: 'owner',
+          createdAt: new Date(),
+          lastModifiedBy: user.id,
+          version: 1,
+        });
 
       return newOrganization;
     },

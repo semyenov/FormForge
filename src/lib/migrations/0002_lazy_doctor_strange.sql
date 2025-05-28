@@ -1,0 +1,1 @@
+ALTER TABLE "session" ALTER COLUMN "expiresAt" DROP DEFAULT;

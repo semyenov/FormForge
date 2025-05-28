@@ -15,12 +15,12 @@ export const formStatusEnum = pgEnum("FormStatus", [
   "rejected",
 ]);
 
-export const forms = pgTable("form", {
+export const forms = pgTable("forms", {
+  id: text("id").primaryKey(),
   createdAt: timestamp("createdAt", { mode: "date", precision: 3 }).notNull().defaultNow(),
   creatorMemberId: text("creatorMemberId").notNull(),
   description: text("description"),
   executorMemberId: text("executorMemberId"),
-  id: text("id").primaryKey(),
   lastModifiedBy: text("lastModifiedBy"),
   organizationId: text("organizationId").notNull(),
   status: formStatusEnum("status").default("draft").notNull(),
@@ -47,7 +47,7 @@ export const formFieldStatusEnum = pgEnum("FormFieldStatus", [
   "approved",
 ]);
 
-export const formFields = pgTable("form_field", {
+export const formFields = pgTable("form_fields", {
   formId: text("formId").notNull(),
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -60,7 +60,7 @@ export const formFields = pgTable("form_field", {
   value: text("value"),
 });
 
-export const formTemplates = pgTable("form_template", {
+export const formTemplates = pgTable("form_templates", {
   createdAt: timestamp("createdAt", { mode: "date", precision: 3 }).notNull().defaultNow(),
   description: text("description"),
   id: text("id").primaryKey(),
@@ -70,7 +70,7 @@ export const formTemplates = pgTable("form_template", {
   version: integer("version").default(1).notNull(),
 });
 
-export const formTemplateFields = pgTable("form_template_field", {
+export const formTemplateFields = pgTable("form_template_fields", {
   defaultValue: text("defaultValue"),
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -82,7 +82,7 @@ export const formTemplateFields = pgTable("form_template_field", {
   validationRules: text("validationRules"),
 });
 
-export const formHistories = pgTable("form_history", {
+export const formHistories = pgTable("form_histories", {
   createdAt: timestamp("createdAt", { mode: "date", precision: 3 }).notNull().defaultNow(),
   data: text("data"),
   formId: text("formId").notNull(),
@@ -96,7 +96,7 @@ export const reviewFlowStatusEnum = pgEnum("ReviewFlowStatus", [
   "closed",
 ]);
 
-export const reviewFlows = pgTable("review_flow", {
+export const reviewFlows = pgTable("review_flows", {
   createdAt: timestamp("createdAt", { mode: "date", precision: 3 }).notNull().defaultNow(),
   formId: text("formId").notNull(),
   id: text("id").primaryKey(),
@@ -107,7 +107,7 @@ export const reviewFlows = pgTable("review_flow", {
   version: integer("version").default(1).notNull(),
 });
 
-export const comments = pgTable("comment", {
+export const comments = pgTable("comments", {
   content: text("content").notNull(),
   createdAt: timestamp("createdAt", { mode: "date", precision: 3 }).notNull().defaultNow(),
   formFieldId: text("formFieldId"),
@@ -122,7 +122,7 @@ export const fileAccessEnum = pgEnum("FileAccess", [
   "public",
 ]);
 
-export const files = pgTable("file", {
+export const files = pgTable("files", {
   accessedAt: timestamp("accessedAt", { mode: "date", precision: 3 }),
   accessLevel: fileAccessEnum("accessLevel").default("organization").notNull(),
   createdAt: timestamp("createdAt", { mode: "date", precision: 3 }).notNull().defaultNow(),
@@ -142,7 +142,7 @@ export const files = pgTable("file", {
   version: integer("version").default(1).notNull(),
 });
 
-export const fileFolders = pgTable("file_folder", {
+export const fileFolders = pgTable("file_folders", {
   createdAt: timestamp("createdAt", { mode: "date", precision: 3 }).notNull().defaultNow(),
   creatorMemberId: text("creatorMemberId").notNull(),
   description: text("description"),
@@ -157,7 +157,7 @@ export const fileFolders = pgTable("file_folder", {
   version: integer("version").default(1).notNull(),
 });
 
-export const fileShares = pgTable("file_share", {
+export const fileShares = pgTable("file_shares", {
   createdAt: timestamp("createdAt", { mode: "date", precision: 3 }).notNull().defaultNow(),
   expiresAt: timestamp("expiresAt", { mode: "date", precision: 3 }),
   fileId: text("fileId").notNull(),
@@ -165,7 +165,7 @@ export const fileShares = pgTable("file_share", {
   memberId: text("memberId").notNull(),
 });
 
-export const formFieldFiles = pgTable("form_field_file", {
+export const formFieldFiles = pgTable("form_field_files", {
   fileId: text("fileId").notNull(),
   formFieldId: text("formFieldId").notNull(),
   id: text("id").primaryKey(),

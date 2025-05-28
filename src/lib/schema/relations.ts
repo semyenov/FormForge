@@ -90,7 +90,7 @@ export default defineRelations(
       }),
       reviewFlow: r.many.reviewFlows({
         from: r.forms.id,
-        to: r.reviewFlows.formId, 
+        to: r.reviewFlows.formId,
         alias: "FormToReviewFlow"
       }),
     },

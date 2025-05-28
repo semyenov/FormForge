@@ -12,7 +12,7 @@ export const userRoleEnum = pgEnum("UserRole", [
   "admin",
 ]);
 
-export const users = pgTable("user", {
+export const users = pgTable("users", {
   banExpires: timestamp("banExpires", { mode: "date", precision: 3 }),
   banned: boolean("banned"),
   banReason: text("banReason"),
@@ -28,7 +28,7 @@ export const users = pgTable("user", {
     .defaultNow(),
 });
 
-export const sessions = pgTable("session", {
+export const sessions = pgTable("sessions", {
   activeOrganizationId: text("activeOrganizationId"),
   createdAt: timestamp("createdAt", { mode: "date", precision: 3 }).defaultNow().notNull(),
   expiresAt: timestamp("expiresAt", { mode: "date", precision: 3 }).notNull(),
@@ -41,7 +41,7 @@ export const sessions = pgTable("session", {
   userId: text("userId").notNull(),
 });
 
-export const accounts = pgTable("account", {
+export const accounts = pgTable("accounts", {
   accessToken: text("accessToken"),
   accessTokenExpiresAt: timestamp("accessTokenExpiresAt", {
     mode: "date",
@@ -63,7 +63,7 @@ export const accounts = pgTable("account", {
   userId: text("userId").notNull(),
 });
 
-export const verifications = pgTable("verification", {
+export const verifications = pgTable("verifications", {
   createdAt: timestamp("createdAt", { mode: "date", precision: 3 }).defaultNow().notNull(),
   expiresAt: timestamp("expiresAt", { mode: "date", precision: 3 }).defaultNow().notNull(),
   id: text("id").primaryKey(),
@@ -72,7 +72,7 @@ export const verifications = pgTable("verification", {
   value: text("value").notNull(),
 });
 
-export const organizations = pgTable("organization", {
+export const organizations = pgTable("organizations", {
   createdAt: timestamp("createdAt", { mode: "date", precision: 3 }).defaultNow().notNull(),
   id: text("id").primaryKey(),
   logo: text("logo"),
@@ -88,7 +88,7 @@ export const memberRoleEnum = pgEnum("MemberRole", [
   "member",
 ]);
 
-export const members = pgTable("member", {
+export const members = pgTable("members", {
   createdAt: timestamp("createdAt", { mode: "date", precision: 3 }).defaultNow().notNull()
     .defaultNow(),
   id: text("id").primaryKey(),
@@ -99,7 +99,7 @@ export const members = pgTable("member", {
   version: integer("version").default(1).notNull(),
 });
 
-export const invitations = pgTable("invitation", {
+export const invitations = pgTable("invitations", {
   email: text("email").notNull(),
   expiresAt: timestamp("expiresAt", { mode: "date", precision: 3 }).defaultNow().notNull(),
   id: text("id").primaryKey(),

@@ -1,6 +1,6 @@
-import { builder } from '../builder';
 import { eq } from 'drizzle-orm';
 import { tables } from '../../schema';
+import { builder } from '../builder';
 
 export const SessionType = builder.drizzleNode('sessions', {
   name: 'Session',
@@ -18,6 +18,7 @@ export const SessionType = builder.drizzleNode('sessions', {
     userAgent: t.exposeString('userAgent', { nullable: true }),
   }),
 });
+
 // Add session query to get the current user's session
 builder.queryField('session', (t) =>
   t.field({

@@ -15,6 +15,20 @@
       "when": 1748413118639,
       "tag": "0001_steady_puppet_master",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1748449311858,
+      "tag": "0002_lazy_doctor_strange",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1748456323961,
+      "tag": "0003_spooky_lifeguard",
+      "breakpoints": true
     }
   ]
 }

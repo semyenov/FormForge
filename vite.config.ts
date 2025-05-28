@@ -15,6 +15,12 @@ export default defineConfig({
         // Start the API server in development mode
         import('./src/server/index');
       }
+    },
+    {
+      name: 'pglite-server',
+      configureServer(server) {
+        import('./src/server/pglite');
+      }
     }
   ],
   server: {

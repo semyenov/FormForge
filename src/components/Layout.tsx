@@ -18,8 +18,10 @@ function classNames(...classes: string[]) {
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
+
+  // me();
 
   const handleLogout = async () => {
     if (user) {
@@ -35,26 +37,25 @@ export default function Layout() {
           <TransitionChild as={Fragment} enter="transition-opacity ease-linear duration-300" enterFrom="opacity-0" enterTo="opacity-100" leave="transition-opacity ease-linear duration-300" leaveFrom="opacity-100" leaveTo="opacity-0">
             <div className="fixed inset-0 bg-gray-900/80" />
           </TransitionChild>
-
-          <div className="fixed inset-0 flex">
+          <div className="flex fixed inset-0">
             <TransitionChild as={Fragment} enter="transition ease-in-out duration-300 transform" enterFrom="-translate-x-full" enterTo="translate-x-0" leave="transition ease-in-out duration-300 transform" leaveFrom="translate-x-0" leaveTo="-translate-x-full">
-              <DialogPanel className="relative mr-16 flex w-full max-w-xs flex-1">
+              <DialogPanel className="flex relative flex-1 mr-16 w-full max-w-xs">
                 <TransitionChild as={Fragment} enter="ease-in-out duration-300" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in-out duration-300" leaveFrom="opacity-100" leaveTo="opacity-0">
-                  <div className="absolute left-full top-0 flex w-16 justify-center pt-5">
+                  <div className="flex absolute top-0 left-full justify-center pt-5 w-16">
                     <button type="button" className="-m-2.5 p-2.5" onClick={() => setSidebarOpen(false)}>
                       <span className="sr-only">Close sidebar</span>
-                      <X className="h-6 w-6 text-white" aria-hidden="true" />
+                      <X className="w-6 h-6 text-white" aria-hidden="true" />
                     </button>
                   </div>
                 </TransitionChild>
 
-                <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white px-6 pb-2">
-                  <div className="flex h-16 shrink-0 items-center">
-                    <Layers className="h-8 w-auto text-blue-600" />
+                <div className="flex overflow-y-auto flex-col gap-y-5 px-6 pb-2 bg-white grow">
+                  <div className="flex items-center h-16 shrink-0">
+                    <Layers className="w-auto h-8 text-blue-600" />
                     <span className="ml-2 text-xl font-semibold">FormForge</span>
                   </div>
-                  <nav className="flex flex-1 flex-col">
-                    <ul role="list" className="flex flex-1 flex-col gap-y-7">
+                  <nav className="flex flex-col flex-1">
+                    <ul role="list" className="flex flex-col flex-1 gap-y-7">
                       <li>
                         <ul role="list" className="-mx-2 space-y-1">
                           {navigation.map((item) => (
@@ -82,13 +83,13 @@ export default function Layout() {
 
       {/* Static sidebar for desktop */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
-        <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white px-6">
-          <div className="flex h-16 shrink-0 items-center">
-            <Layers className="h-8 w-auto text-blue-600" />
+        <div className="flex overflow-y-auto flex-col gap-y-5 px-6 bg-white border-r border-gray-200 grow">
+          <div className="flex items-center h-16 shrink-0">
+            <Layers className="w-auto h-8 text-blue-600" />
             <span className="ml-2 text-xl font-semibold">FormForge</span>
           </div>
-          <nav className="flex flex-1 flex-col">
-            <ul role="list" className="flex flex-1 flex-col gap-y-7">
+          <nav className="flex flex-col flex-1">
+            <ul role="list" className="flex flex-col flex-1 gap-y-7">
               <li>
                 <ul role="list" className="-mx-2 space-y-1">
                   {navigation.map((item) => (
@@ -106,8 +107,8 @@ export default function Layout() {
                 </ul>
               </li>
               <li className="mt-auto">
-                <a href="#" className="group -mx-2 flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 text-gray-700 hover:bg-gray-50 hover:text-blue-600">
-                  <Settings className="h-6 w-6 shrink-0 text-gray-400 group-hover:text-blue-600" aria-hidden="true" />
+                <a href="#" className="flex gap-x-3 p-2 -mx-2 text-sm font-semibold leading-6 text-gray-700 rounded-md group hover:bg-gray-50 hover:text-blue-600">
+                  <Settings className="w-6 h-6 text-gray-400 shrink-0 group-hover:text-blue-600" aria-hidden="true" />
                   Settings
                 </a>
               </li>
@@ -116,16 +117,16 @@ export default function Layout() {
         </div>
       </div>
 
-      <div className="sticky top-0 z-40 flex items-center gap-x-6 bg-white px-4 py-4 shadow-sm sm:px-6 lg:hidden">
+      <div className="flex sticky top-0 z-40 gap-x-6 items-center px-4 py-4 bg-white shadow-sm sm:px-6 lg:hidden">
         <button type="button" className="-m-2.5 p-2.5 text-gray-700 lg:hidden" onClick={() => setSidebarOpen(true)}>
           <span className="sr-only">Open sidebar</span>
-          <MenuIcon className="h-6 w-6" aria-hidden="true" />
+          <MenuIcon className="w-6 h-6" aria-hidden="true" />
         </button>
         <div className="flex-1 text-sm font-semibold leading-6 text-gray-900">Dashboard</div>
         <Menu as="div" className="relative">
           <MenuButton className="-m-1.5 flex items-center p-1.5">
             <span className="sr-only">Open user menu</span>
-            <User className="h-8 w-8 rounded-full bg-gray-50 p-1" aria-hidden="true" />
+            <User className="p-1 w-8 h-8 bg-gray-50 rounded-full" aria-hidden="true" />
           </MenuButton>
           <Transition as={Fragment} enter="transition ease-out duration-100" enterFrom="transform opacity-0 scale-95" enterTo="transform opacity-100 scale-100" leave="transition ease-in duration-75" leaveFrom="transform opacity-100 scale-100" leaveTo="transform opacity-0 scale-95">
             <MenuItems className="absolute right-0 z-10 mt-2.5 w-32 origin-top-right rounded-md bg-white py-2 shadow-lg ring-1 ring-gray-900/5 focus:outline-none">
@@ -144,6 +145,12 @@ export default function Layout() {
       <main className="py-10 lg:pl-72">
         <div className="px-4 sm:px-6 lg:px-8">
           <Outlet />
+          {user && (
+            <>
+              {JSON.stringify(user)}
+              <button onClick={handleLogout}>Logout</button>
+            </>
+          )}
         </div>
       </main>
     </div>

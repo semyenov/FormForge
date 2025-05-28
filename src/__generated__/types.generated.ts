@@ -172,8 +172,10 @@ export type Member = Node & {
   __typename?: 'Member';
   createdAt: Scalars['Date']['output'];
   id: Scalars['ID']['output'];
+  organization: Organization;
+  organizationId: Scalars['String']['output'];
   role: MemberRole;
-  user: User;
+  userId: Scalars['String']['output'];
 };
 
 export enum MemberRole {
@@ -455,6 +457,7 @@ export type User = Node & {
   emailVerified?: Maybe<Scalars['Boolean']['output']>;
   id: Scalars['ID']['output'];
   image?: Maybe<Scalars['String']['output']>;
+  members: Array<Member>;
   name: Scalars['String']['output'];
   role: Scalars['String']['output'];
   updatedAt: Scalars['Date']['output'];

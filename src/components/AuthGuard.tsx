@@ -9,7 +9,7 @@ type AuthGuardProps = {
 };
 
 const AuthGuard = ({ children, requireActiveOrg = false }: AuthGuardProps) => {
-  const { isAuthenticated, user, session, loading, error } = useAuth();
+  const { isAuthenticated, session, loading, error } = useAuth();
   const location = useLocation();
 
   // Handle authentication errors
@@ -42,7 +42,7 @@ const AuthGuard = ({ children, requireActiveOrg = false }: AuthGuardProps) => {
   // Show loading spinner while auth state is being determined
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex justify-center items-center h-screen">
         Loading...
       </div>
     );

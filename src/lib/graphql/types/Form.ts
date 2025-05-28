@@ -121,7 +121,7 @@ builder.queryField('form', (t) =>
     authScopes: {
       loggedIn: true,
     },
-    resolve: async (_, args, { db, session }) => {
+    resolve: async (_, args, { db }) => {
       const form = await db.query.forms.findFirst({
         where: { id: args.id },
       });

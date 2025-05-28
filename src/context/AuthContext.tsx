@@ -1,23 +1,11 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  ReactNode,
-  useEffect,
-  useCallback,
-} from "react";
+import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
 import { gql } from "@apollo/client";
-import { Session, User } from "../__generated__/types.generated";
-import {
-  useLoginMutation,
-  useLogoutMutation,
-  useRegisterMutation,
-  useSessionQuery,
-  useMeQuery,
-} from "./__generated__/AuthContext.generated.tsx";
+import { Session } from "../__generated__/types.generated";
+import { useLoginMutation, useLogoutMutation, useRegisterMutation, useSessionQuery, useMeQuery, MeQuery } from "./__generated__/AuthContext.generated.tsx";
+import { useSetActiveOrganizationMutation } from "../pages/__generated__/OrganizationList.generated.tsx";
 
 type AuthState = {
-  user: User | null;
+  user: MeQuery["me"] | null;
   session: Session | null;
   loading: boolean;
   error: Error | null;
@@ -27,6 +15,7 @@ type AuthContextType = AuthState & {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
+  setActiveOrganization: (organizationId: string) => Promise<void>;
   isAuthenticated: boolean;
 };
 
@@ -61,6 +50,13 @@ export const ME_QUERY = gql`
       banned
       createdAt
       updatedAt
+      members {
+        id
+        organization {
+          id
+          name
+        }
+      }
     }
   }
 `;
@@ -78,6 +74,13 @@ export const LOGIN_MUTATION = gql`
       banned
       createdAt
       updatedAt
+      members {
+        id
+        organization {
+          id
+          name
+        }
+      }
     }
   }
 `;
@@ -95,6 +98,13 @@ export const REGISTER_MUTATION = gql`
       banned
       createdAt
       updatedAt
+      members {
+        id
+        organization {
+          id
+          name
+        }
+      }
     }
   }
 `;
@@ -118,6 +128,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loginMutation] = useLoginMutation();
   const [logoutMutation] = useLogoutMutation();
   const [registerMutation] = useRegisterMutation();
+  const [setActiveOrganizationMutation] = useSetActiveOrganizationMutation();
 
   const { refetch: refetchSession } = useSessionQuery({
     onCompleted: (data) => {
@@ -133,7 +144,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { refetch: refetchMe } = useMeQuery({
     onCompleted: (data) => {
       if (data?.me) {
-        setAuthState((prev) => ({ ...prev, user: data.me }));
+        setAuthState((prev) => ({
+          ...prev,
+          user: data.me,
+        }));
       }
     },
     onError: (error) => {
@@ -151,7 +165,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const { data: userData } = await refetchMe();
 
           setAuthState({
-            user: userData?.me || null,
+            user: userData.me,
             session: sessionData.session,
             loading: false,
             error: null,
@@ -169,8 +183,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           user: null,
           session: null,
           loading: false,
-          error:
-            error instanceof Error ? error : new Error("Authentication failed"),
+          error: error instanceof Error ? error : new Error("Authentication failed"),
         });
       }
     };
@@ -189,9 +202,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (loginData?.login) {
           const { data: sessionData } = await refetchSession();
+          const { data: userData } = await refetchMe();
 
           setAuthState({
-            user: loginData.login,
+            user: userData.me,
             session: sessionData?.session || null,
             loading: false,
             error: null,
@@ -209,7 +223,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw error;
       }
     },
-    [loginMutation, refetchSession],
+    [loginMutation, refetchSession, refetchMe],
   );
 
   const logout = useCallback(async () => {
@@ -251,9 +265,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (registerData?.register) {
           const { data: sessionData } = await refetchSession();
+          const { data: userData } = await refetchMe();
 
           setAuthState({
-            user: registerData.register,
+            user: userData.me,
             session: sessionData?.session || null,
             loading: false,
             error: null,
@@ -266,13 +281,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           user: null,
           session: null,
           loading: false,
-          error:
-            error instanceof Error ? error : new Error("Registration failed"),
+          error: error instanceof Error ? error : new Error("Registration failed"),
         });
         throw error;
       }
     },
-    [registerMutation, refetchSession],
+    [registerMutation, refetchSession, refetchMe],
+  );
+
+  const setActiveOrganization = useCallback(
+    async (organizationId: string) => {
+      await setActiveOrganizationMutation({ variables: { organizationId } });
+    },
+    [setActiveOrganizationMutation],
   );
 
   const value: AuthContextType = {
@@ -280,6 +301,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     login,
     logout,
     register,
+    setActiveOrganization,
     isAuthenticated: !!authState.user && !!authState.session,
   };
 

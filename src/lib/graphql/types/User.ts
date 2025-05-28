@@ -14,6 +14,7 @@ export const UserType = builder.drizzleNode('users', {
     role: t.exposeString('role'),
     createdAt: t.expose('createdAt', { type: 'Date' }),
     updatedAt: t.expose('updatedAt', { type: 'Date' }),
+    members: t.relation('members'),
   }),
 });
 
@@ -31,6 +32,13 @@ builder.queryField('me', (t) =>
 
       const foundUser = await db.query.users.findFirst({
         where: { id: user.id },
+        with: {
+          members: {
+            with: {
+              organization: true,
+            },
+          },
+        },
       });
 
       if (!foundUser) {
