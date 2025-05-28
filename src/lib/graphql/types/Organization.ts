@@ -177,6 +177,15 @@ builder.mutationField('createOrganization', (t) =>
         createdAt: new Date(),
       });
 
+      // Return the created organization
+      const newOrganization = await db.query.organizations.findFirst({
+        where: { id: organizationId },
+      });
+
+      if (!newOrganization) {
+        throw new Error('Failed to create organization');
+      }
+
       // Add the current user as an owner
       const memberId = crypto.randomUUID();
       await db.insert(tables.members).values({
@@ -188,15 +197,6 @@ builder.mutationField('createOrganization', (t) =>
         lastModifiedBy: user.id,
         version: 1,
       });
-
-      // Return the created organization
-      const newOrganization = await db.query.organizations.findFirst({
-        where: { id: organizationId },
-      });
-
-      if (!newOrganization) {
-        throw new Error('Failed to create organization');
-      }
 
       return newOrganization;
     },
